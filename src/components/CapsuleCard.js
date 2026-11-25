@@ -6,7 +6,7 @@ import InstaxFrame from './InstaxFrame';
 import CassettePlayer from './CassettePlayer';
 import PostItNote from './PostItNote';
 
-export default function CapsuleCard({ capsule, onUnlockSuccess }) {
+export default function CapsuleCard({ capsule, onUnlockSuccess, onPressCard }) {
   const [isUnlocked, setIsUnlocked] = useState(capsule.isUnlocked);
   const [showRiddleModal, setShowRiddleModal] = useState(false);
   const [riddleAnswer, setRiddleAnswer] = useState('');
@@ -212,9 +212,15 @@ export default function CapsuleCard({ capsule, onUnlockSuccess }) {
         {capsule.isGroup && (
           <TouchableOpacity
             style={styles.addMemoryBtn}
-            onPress={() => Alert.alert('📸 Anı Ekle', 'Grubun bu kapsülüne fotoğraf, ses kasedi veya not ekleme ekranı açılıyor.')}
+            onPress={onPressCard || (() => Alert.alert('📸 Anı Ekle', 'Kapsül detayında anı ekleme penceresi açılıyor.'))}
           >
             <Text style={styles.addMemoryBtnText}>➕ Anı Ekle</Text>
+          </TouchableOpacity>
+        )}
+
+        {onPressCard && (
+          <TouchableOpacity style={styles.detailBtn} onPress={onPressCard}>
+            <Text style={styles.detailBtnText}>Detay & Aç →</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -223,6 +229,15 @@ export default function CapsuleCard({ capsule, onUnlockSuccess }) {
 }
 
 const styles = StyleSheet.create({
+  detailBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  detailBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.burgundy,
+  },
   cardContainer: {
     backgroundColor: colors.cardBg,
     borderRadius: 16,

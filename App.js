@@ -1,20 +1,93 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Platform, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from './src/theme/colors';
 import { mockCapsules } from './src/data/mockCapsules';
+import { storageService } from './src/services/storageService';
 import FeedScreen from './src/screens/FeedScreen';
 import CreateScreen from './src/screens/CreateScreen';
+import InboxScreen from './src/screens/InboxScreen';
+import CapsuleDetailModal from './src/screens/CapsuleDetailModal';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('feed'); // 'feed', 'create', 'inbox'
   const [capsulesList, setCapsulesList] = useState(mockCapsules);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedCapsule, setSelectedCapsule] = useState(null);
 
-  // Yeni kapsül eklendiğinde listenin en başına koy ve Akış'a geç
-  const handleCapsuleCreated = (newCapsule) => {
-    setCapsulesList([newCapsule, ...capsulesList]);
+  // Uygulama açılışında AsyncStorage'dan kayıtlı verileri yükle
+  useEffect(() => {
+    async function initStorage() {
+      try {
+        const stored = await storageService.loadCapsules();
+        if (stored && stored.length > 0) {
+          setCapsulesList(stored);
+        }
+      } catch (err) {
+        console.warn('Storage init failed:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    initStorage();
+  }, []);
+
+  // Yeni kapsül eklendiğinde
+  const handleCapsuleCreated = async (newCapsule) => {
+    const updated = [newCapsule, ...capsulesList];
+    setCapsulesList(updated);
+    await storageService.saveCapsules(updated);
     setCurrentTab('feed');
   };
+
+  // Kapsül mührü açıldığında
+  const handleUnlockCapsule = async (capsuleId) => {
+    const updated = capsulesList.map((c) => {
+      if (c.id === capsuleId) {
+        return { ...c, isUnlocked: true };
+      }
+      return c;
+    });
+    setCapsulesList(updated);
+    if (selectedCapsule && selectedCapsule.id === capsuleId) {
+      setSelectedCapsule({ ...selectedCapsule, isUnlocked: true });
+    }
+    await storageService.saveCapsules(updated);
+  };
+
+  // Kapsüle anı eklendiğinde
+  const handleAddMemory = async (capsuleId, newMemory) => {
+    const updated = capsulesList.map((c) => {
+      if (c.id === capsuleId) {
+        const memories = c.memories ? [...c.memories, newMemory] : [newMemory];
+        return {
+          ...c,
+          memoryCount: memories.length,
+          memories: memories,
+        };
+      }
+      return c;
+    });
+    setCapsulesList(updated);
+    if (selectedCapsule && selectedCapsule.id === capsuleId) {
+      const memories = selectedCapsule.memories ? [...selectedCapsule.memories, newMemory] : [newMemory];
+      setSelectedCapsule({
+        ...selectedCapsule,
+        memoryCount: memories.length,
+        memories: memories,
+      });
+    }
+    await storageService.saveCapsules(updated);
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.burgundy} />
+        <Text style={styles.loadingText}>✨ TimeCapsule Yükleniyor... ✨</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -22,27 +95,39 @@ export default function App() {
 
       {/* Ana Ekran Alanı */}
       <View style={styles.contentArea}>
+        {/* 1. SEKME: AKIŞ */}
         {currentTab === 'feed' && (
           <FeedScreen
             capsules={capsulesList}
             onNavigateToCreate={() => setCurrentTab('create')}
+            onSelectCapsule={(cap) => setSelectedCapsule(cap)}
           />
         )}
         
+        {/* 2. SEKME: OLUŞTUR */}
         {currentTab === 'create' && (
           <CreateScreen onCapsuleCreated={handleCapsuleCreated} />
         )}
 
+        {/* 3. SEKME: ÖZELİM & GRUP KUTUSU */}
         {currentTab === 'inbox' && (
-          <View style={styles.placeholderScreen}>
-            <Text style={styles.placeholderIcon}>💌</Text>
-            <Text style={styles.placeholderTitle}>Özelim & Grup Kutusu</Text>
-            <Text style={styles.placeholderDesc}>
-              3. Adımda sana ve ait olduğun arkadaş gruplarına gelen kilitli davetleri ve mühürlü anıları burada listeleyeceğiz!
-            </Text>
-          </View>
+          <InboxScreen
+            capsules={capsulesList}
+            onSelectCapsule={(cap) => setSelectedCapsule(cap)}
+          />
         )}
       </View>
+
+      {/* DETAY VE SCRAPBOOK AÇILIŞ MODALI */}
+      {selectedCapsule && (
+        <CapsuleDetailModal
+          visible={!!selectedCapsule}
+          capsule={selectedCapsule}
+          onClose={() => setSelectedCapsule(null)}
+          onUnlock={handleUnlockCapsule}
+          onAddMemory={handleAddMemory}
+        />
+      )}
 
       {/* Scrapbook Bottom Navigation Bar */}
       <View style={styles.bottomNav}>
@@ -108,6 +193,18 @@ const styles = StyleSheet.create({
   contentArea: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.burgundyDark,
   },
   bottomNav: {
     backgroundColor: colors.parchment,
@@ -195,28 +292,5 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     marginTop: -2,
-  },
-  placeholderScreen: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 30,
-    backgroundColor: colors.background,
-  },
-  placeholderIcon: {
-    fontSize: 54,
-    marginBottom: 16,
-  },
-  placeholderTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.burgundyDark,
-    marginBottom: 8,
-  },
-  placeholderDesc: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
   },
 });

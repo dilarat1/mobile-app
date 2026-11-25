@@ -7,25 +7,25 @@
 
 ---
 
-## 📖 Proje Hakkında
-**TimeCapsule**, kişilerin ve arkadaş gruplarının anılarını (fotoğraflar, ses kayıtları, notlar) geleceğe veya belirli koşullara mühürleyip saklayabildiği, sıcacık bir **vintage scrapbook (anı defteri)** estetiğine sahip hibrit bir mobil uygulamadır.
+## 📖 1. Proje Özeti & Konsept
+**TimeCapsule**, kişilerin ve arkadaş gruplarının anılarını (fotoğraflar, ses kayıtları, post-it notları) geleceğe veya belirli koşullara mühürleyip saklayabildiği, sıcacık bir **vintage scrapbook (anı defteri)** estetiğine sahip hibrit bir mobil uygulamadır.
 
 Instagram tarzı bir **kamusal/topluluk akışı** ile WhatsApp tarzı **ortak grup kapsülleri** konseptini birleştirir.
 
 ---
 
-## 🎨 Tasarım Estetiği (Cozy Vintage Scrapbook)
-- **Pötikare (Gingham) Kumaş Dokuları:** Bordo, parşömen kremi ve vintage lacivert desenler.
+## 🎨 2. Tasarım Dili (Cozy Vintage Scrapbook)
+- **Pötikare (Gingham) Kumaş Dokuları:** Bordo (`#731C28`), krem parşömen (`#FAF7F2`) ve vintage lacivert (`#283B4F`) desenler.
 - **Fisto & Dantel Detayları:** Üst başlıklarda ve kart kenarlarında nostaljik dantel işlemeleri.
 - **Kırmızı Kurdele Fiyonkları (`🎀`) ve Altın Pırıltılar (`✦`):** Sıcak ve samimi bir atmosfer.
 - **Scrapbook İçerik Bileşenleri:**
-  - 📸 **Instax / Polaroid:** Washi bantlı, hafif eğik açılı fotoğraf kartları.
-  - 🎙️ **Retro Kaset Çalar:** Dönen makaralarıyla çalınabilir nostaljik ses kayıtları.
-  - 📌 **Post-it Notları:** Kırmızı iğneli, el yazısı fontlu anı ve itiraf kağıtları.
+  - 📸 **Instax / Polaroid (`InstaxFrame.js`):** Washi bantlı, hafif eğik açılı fotoğraf kartları.
+  - 🎙️ **Retro Kaset Çalar (`CassettePlayer.js`):** Dönen makaralarıyla çalınabilir nostaljik ses kayıtları.
+  - 📌 **Post-it Notları (`PostItNote.js`):** Kırmızı iğneli, el yazısı fontlu anı ve itiraf kağıtları.
 
 ---
 
-## 🔐 Modüler Kilit Sistemi (Flexible Modular Locks)
+## 🔐 3. Modüler Kilit Sistemi (Flexible Modular Locks)
 Bir kapsül oluşturulurken aşağıdaki kilit şartlarından herhangi biri veya hepsi bir arada seçilebilir:
 
 1. **Sadece Zaman Kilidi (`time`):** Belirlenen tarihe kadar açılmaz (Örn: *1 Yıl Sonraki Kendime Mektup*).
@@ -38,29 +38,47 @@ Bir kapsül oluşturulurken aşağıdaki kilit şartlarından herhangi biri veya
 
 ---
 
-## 👥 Grupça Kapsül Oluşturma (WhatsApp Mantığı)
-- Kapsüller tekil olarak oluşturulabildiği gibi arkadaş gruplarıyla ortak (`isGroup: true`) olarak da başlatılabilir.
-- Kapsülün kilit açılış zamanına kadar davet edilen tüm arkadaşlar kapsüle **"➕ Anı Ekle"** butonuyla fotoğraf, ses kaydı veya post-it ekleyebilir.
+## 📱 4. Ekran Mimarisi & Sayfalar
+1. **📜 1. Ekran: Akış (FeedScreen):**
+   - Topluluk ve arkadaş kapsüllerinin listelendiği akış.
+   - Gerçek zamanlı arama ve filtreleme hapları (*Tümü*, *Grupça*, *Kilitli*, *Açılanlar*).
+   - Kart üzerinde hızlı beğeni/kalp ve anı ekleme etkileşimi.
+2. **✨ 2. Ekran: Kapsül Oluştur (CreateScreen):**
+   - Canlı kilit önizleme bandı (`MÜHÜR TÜRÜ: Zaman + Mekan + Şifre`).
+   - WhatsApp tarzı arkadaş grubu seçimi ve katılımcı etiket çipleri.
+   - Modüler kilit anahtarları (Tarih butonları, mekan seçici, gizli soru & cevap alanları).
+   - İlk anıyı seçme (Polaroid + washi bant rengi, ses kasedi veya post-it).
+3. **💌 3. Ekran: Özelim & Grup Kutusu (InboxScreen):**
+   - Kullanıcıya ve ait olduğu gruplara özel mühürlü davet kutusu.
+   - *Grup Kapsüllerim* ve *Kişisel Mühürlerim* sekmeli görünümü.
+4. **🎉 4. Ekran / Modal: Kapsül Açılışı & Scrapbook Detayı (CapsuleDetailModal):**
+   - Kilit açma simülasyonu (şifre çözücü, konum kontrolü, geri sayım).
+   - Açılan kapsül için altın yıldızlı kutlama başlığı.
+   - Polaroid galerisi, çalınabilir kasetler, iliştirilmiş post-it'ler ve yeni anı ekleme formu.
 
 ---
 
-## 📱 Ekran Mimarisi
-1. **📜 Akış (Feed):** Topluluk ve arkadaş kapsüllerinin listelendiği, arama ve filtreleme yapılabilen ana akış.
-2. **✨ Kapsül Yap (Create):** Modüler kilitlerin, grup arkadaşlarının ve anıların seçildiği form ekranı.
-3. **💌 Özelim (Inbox):** Kullanıcıya ve ait olduğu gruplara özel mühürlü davet kutusu.
+## 💾 5. Veri Kalıcılığı (AsyncStorage)
+- `@react-native-async-storage/async-storage` entegrasyonu sayesinde:
+  - Yeni oluşturulan kapsüller,
+  - Çözülen kilitler,
+  - Eklenen yeni anılar ve beğeniler  
+  cihaz hafızasında kalıcı olarak saklanır, uygulama kapatılıp açılsa bile kaybolmaz.
 
 ---
 
-## 🛠️ Kurulum ve Çalıştırma
-
-Projeyi yerel makinenizde çalıştırmak için:
+## 🛠️ 6. Kurulum ve Çalıştırma
 
 ```bash
-# Bağımlılıkları yükleyin
+# 1. Depoyu klonlayın
+git clone https://github.com/dilarat1/mobile-app.git
+cd mobile-app
+
+# 2. Bağımlılıkları yükleyin
 npm install
 
-# Expo geliştirici sunucusunu başlatın
+# 3. Expo geliştirici sunucusunu başlatın
 npx expo start
 ```
 
-Expo Go mobil uygulaması üzerinden QR kodu taratarak veya Android / iOS emülatöründe anında test edebilirsiniz.
+Expo Go mobil uygulaması üzerinden QR kodu taratarak Android veya iOS cihazınızda canlı olarak test edebilirsiniz.

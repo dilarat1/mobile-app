@@ -13,7 +13,7 @@ import { mockCapsules } from '../data/mockCapsules';
 import GinghamHeader from '../components/GinghamHeader';
 import CapsuleCard from '../components/CapsuleCard';
 
-export default function FeedScreen({ capsules: propCapsules, onNavigateToCreate }) {
+export default function FeedScreen({ capsules: propCapsules, onNavigateToCreate, onSelectCapsule }) {
   const [internalCapsules, setInternalCapsules] = useState(mockCapsules);
   const capsules = propCapsules || internalCapsules;
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,7 +102,12 @@ export default function FeedScreen({ capsules: propCapsules, onNavigateToCreate 
       <FlatList
         data={filteredCapsules}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <CapsuleCard capsule={item} />}
+        renderItem={({ item }) => (
+          <CapsuleCard
+            capsule={item}
+            onPressCard={() => onSelectCapsule && onSelectCapsule(item)}
+          />
+        )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
