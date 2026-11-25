@@ -23,13 +23,13 @@ export default function CapsuleDetailModal({
   onUnlock,
   onAddMemory,
 }) {
-  if (!capsule) return null;
-
-  const [isUnlocked, setIsUnlocked] = useState(capsule.isUnlocked);
+  const [isUnlocked, setIsUnlocked] = useState(capsule?.isUnlocked || false);
   const [showRiddleInput, setShowRiddleInput] = useState(false);
   const [riddleAnswer, setRiddleAnswer] = useState('');
   const [showAddMemoryModal, setShowAddMemoryModal] = useState(false);
   const [newPostItText, setNewPostItText] = useState('');
+
+  if (!capsule) return null;
 
   // Kilit açma işlemi
   const handleTryUnlock = () => {
