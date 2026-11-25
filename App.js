@@ -2,10 +2,19 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from './src/theme/colors';
+import { mockCapsules } from './src/data/mockCapsules';
 import FeedScreen from './src/screens/FeedScreen';
+import CreateScreen from './src/screens/CreateScreen';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('feed'); // 'feed', 'create', 'inbox'
+  const [capsulesList, setCapsulesList] = useState(mockCapsules);
+
+  // Yeni kapsül eklendiğinde listenin en başına koy ve Akış'a geç
+  const handleCapsuleCreated = (newCapsule) => {
+    setCapsulesList([newCapsule, ...capsulesList]);
+    setCurrentTab('feed');
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -13,16 +22,15 @@ export default function App() {
 
       {/* Ana Ekran Alanı */}
       <View style={styles.contentArea}>
-        {currentTab === 'feed' && <FeedScreen />}
+        {currentTab === 'feed' && (
+          <FeedScreen
+            capsules={capsulesList}
+            onNavigateToCreate={() => setCurrentTab('create')}
+          />
+        )}
         
         {currentTab === 'create' && (
-          <View style={styles.placeholderScreen}>
-            <Text style={styles.placeholderIcon}>✨</Text>
-            <Text style={styles.placeholderTitle}>Yeni Kapsül Oluştur</Text>
-            <Text style={styles.placeholderDesc}>
-              2. Adımda burayı pötikare desenli, modüler kilit seçimi (Zaman, Mekan, Şifre) ve arkadaş grubu ekleme formuyla inşa edeceğiz!
-            </Text>
-          </View>
+          <CreateScreen onCapsuleCreated={handleCapsuleCreated} />
         )}
 
         {currentTab === 'inbox' && (
@@ -30,7 +38,7 @@ export default function App() {
             <Text style={styles.placeholderIcon}>💌</Text>
             <Text style={styles.placeholderTitle}>Özelim & Grup Kutusu</Text>
             <Text style={styles.placeholderDesc}>
-              3. Adımda sana ve gruplarına gelen kilitli davetleri ve mühürlü anıları burada listeleyeceğiz!
+              3. Adımda sana ve ait olduğun arkadaş gruplarına gelen kilitli davetleri ve mühürlü anıları burada listeleyeceğiz!
             </Text>
           </View>
         )}

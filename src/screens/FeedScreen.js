@@ -13,8 +13,9 @@ import { mockCapsules } from '../data/mockCapsules';
 import GinghamHeader from '../components/GinghamHeader';
 import CapsuleCard from '../components/CapsuleCard';
 
-export default function FeedScreen() {
-  const [capsules, setCapsules] = useState(mockCapsules);
+export default function FeedScreen({ capsules: propCapsules, onNavigateToCreate }) {
+  const [internalCapsules, setInternalCapsules] = useState(mockCapsules);
+  const capsules = propCapsules || internalCapsules;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all'); // 'all', 'group', 'locked', 'unlocked'
 
