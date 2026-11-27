@@ -33,7 +33,10 @@ export default function InboxScreen({ capsules, currentUser, onSelectCapsule, on
             <Image source={{ uri: currentUser.avatar }} style={styles.accountAvatar} />
             <View>
               <Text style={styles.accountName}>{currentUser.name}</Text>
-              <Text style={styles.accountId}>{currentUser.identifier}</Text>
+              <Text style={styles.accountId}>
+                {currentUser.email || currentUser.identifier}
+                {currentUser.phoneDisplay ? ` • ${currentUser.phoneDisplay}` : ''}
+              </Text>
             </View>
           </View>
           {onLogout && (

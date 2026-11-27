@@ -21,7 +21,9 @@ export default function AuthScreen({ onAuthSuccess }) {
 
   // Form alanları
   const [fullName, setFullName] = useState('');
-  const [identifier, setIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Giriş yaparken (e-posta veya telefon)
+  const [regEmail, setRegEmail] = useState(''); // Kayıt olurken birleşik e-posta
+  const [regPhone, setRegPhone] = useState(''); // Kayıt olurken birleşik telefon
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -86,16 +88,20 @@ export default function AuthScreen({ onAuthSuccess }) {
     onAuthSuccess(res.user);
   };
 
-  // Kayıt Ol - 1. Adım: Bilgileri doğrula ve 6 haneli doğrulama kodu gönder
+  // Kayıt Ol - 1. Adım: E-posta + Telefon bilgilerini doğrula ve 6 haneli doğrulama kodu gönder
   const handleSendRegisterOtp = async () => {
     clearMessages();
     if (fullName.trim().length < 2) {
       setErrorMsg('Lütfen ad ve soyadını gir.');
       return;
     }
-    const idErr = validateIdentifier(identifier);
-    if (idErr) {
-      setErrorMsg(idErr);
+    if (!regEmail.trim().includes('@') || !regEmail.trim().includes('.')) {
+      setErrorMsg('Lütfen geçerli bir e-posta adresi gir (örn: ad@mail.com).');
+      return;
+    }
+    const phoneDigits = regPhone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      setErrorMsg('Lütfen geçerli bir telefon numarası gir (en az 10 hane).');
       return;
     }
     if (password.length < 6) {
@@ -107,13 +113,13 @@ export default function AuthScreen({ onAuthSuccess }) {
       return;
     }
 
-    // Aynı mail veya telefon zaten kayıtlı mı kontrol et
-    const users = await storageService.getRegisteredUsers();
-    const exists = users.find(
-      (u) => u.identifier.toLowerCase() === identifier.trim().toLowerCase()
-    );
-    if (exists) {
-      setErrorMsg('Bu bilgiyle zaten bir hesap mevcut. Giriş yapmayı dene.');
+    // Aynı mail VEYA telefon zaten kayıtlı mı kontrol et (Ayrı hesap açılmasını engeller!)
+    const dup = await storageService.checkAccountExists({
+      email: regEmail,
+      phone: regPhone,
+    });
+    if (dup.exists) {
+      setErrorMsg(dup.reason + ' Aynı kişi ikinci bir hesap açamaz.');
       return;
     }
 
@@ -122,13 +128,11 @@ export default function AuthScreen({ onAuthSuccess }) {
     setRegisterOtpInput('');
     setRegisterStep(2);
     setSuccessMsg(
-      `${
-        method === 'phone' ? '📱 Telefonuna SMS' : '✉️ E-postana'
-      } doğrulama kodu gönderildi! (Test Kodu: ${otp})`
+      `📱 ${regPhone.trim()} ve ✉️ ${regEmail.trim()} için doğrulama kodu gönderildi! (Test Kodu: ${otp})`
     );
   };
 
-  // Kayıt Ol - 2. Adım: Doğrulama kodunu kontrol et ve hesabı aç
+  // Kayıt Ol - 2. Adım: Doğrulama kodunu kontrol et ve tek birleşik hesabı aç
   const handleVerifyAndRegister = async () => {
     clearMessages();
     if (registerOtpInput.trim() !== registerSentOtp) {
@@ -138,8 +142,8 @@ export default function AuthScreen({ onAuthSuccess }) {
 
     const res = await storageService.registerUser({
       fullName,
-      method,
-      identifier,
+      email: regEmail,
+      phone: regPhone,
       password,
     });
     if (!res.ok) {
@@ -292,84 +296,114 @@ export default function AuthScreen({ onAuthSuccess }) {
           {/* ================= 1. GİRİŞ YAP & KAYIT OL (1. ADIM) ================= */}
           {(mode === 'login' || (mode === 'register' && registerStep === 1)) && (
             <View>
-              {/* Yöntem Seçimi: E-posta vs Telefon No */}
-              <View style={styles.methodRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.methodPill,
-                    method === 'email' && styles.methodPillActive,
-                  ]}
-                  onPress={() => {
-                    setMethod('email');
-                    setIdentifier('');
-                    clearMessages();
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.methodText,
-                      method === 'email' && styles.methodTextActive,
-                    ]}
-                  >
-                    ✉️ E-posta ile
-                  </Text>
-                </TouchableOpacity>
+              {/* GİRİŞ MODU: E-posta veya Telefon No ile tek hesaba giriş */}
+              {mode === 'login' && (
+                <>
+                  <View style={styles.methodRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.methodPill,
+                        method === 'email' && styles.methodPillActive,
+                      ]}
+                      onPress={() => {
+                        setMethod('email');
+                        setIdentifier('');
+                        clearMessages();
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.methodText,
+                          method === 'email' && styles.methodTextActive,
+                        ]}
+                      >
+                        ✉️ E-posta ile
+                      </Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[
-                    styles.methodPill,
-                    method === 'phone' && styles.methodPillActive,
-                  ]}
-                  onPress={() => {
-                    setMethod('phone');
-                    setIdentifier('');
-                    clearMessages();
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.methodText,
-                      method === 'phone' && styles.methodTextActive,
-                    ]}
-                  >
-                    📱 Telefon No ile
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                    <TouchableOpacity
+                      style={[
+                        styles.methodPill,
+                        method === 'phone' && styles.methodPillActive,
+                      ]}
+                      onPress={() => {
+                        setMethod('phone');
+                        setIdentifier('');
+                        clearMessages();
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.methodText,
+                          method === 'phone' && styles.methodTextActive,
+                        ]}
+                      >
+                        📱 Telefon No ile
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-              {/* Ad Soyad (Sadece Kayıt Olurken) */}
-              {mode === 'register' && (
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>Ad Soyad *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Örn: Dilara Toraman"
-                    placeholderTextColor="#998"
-                    value={fullName}
-                    onChangeText={setFullName}
-                  />
-                </View>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>
+                      {method === 'email' ? 'E-posta Adresi *' : 'Telefon Numarası *'}
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={
+                        method === 'email' ? 'ornek@mail.com' : '05XX XXX XX XX'
+                      }
+                      placeholderTextColor="#998"
+                      keyboardType={
+                        method === 'email' ? 'email-address' : 'phone-pad'
+                      }
+                      autoCapitalize="none"
+                      value={identifier}
+                      onChangeText={setIdentifier}
+                    />
+                  </View>
+                </>
               )}
 
-              {/* E-posta veya Telefon Girişi */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.inputLabel}>
-                  {method === 'email' ? 'E-posta Adresi *' : 'Telefon Numarası *'}
-                </Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={
-                    method === 'email' ? 'ornek@mail.com' : '05XX XXX XX XX'
-                  }
-                  placeholderTextColor="#998"
-                  keyboardType={
-                    method === 'email' ? 'email-address' : 'phone-pad'
-                  }
-                  autoCapitalize="none"
-                  value={identifier}
-                  onChangeText={setIdentifier}
-                />
-              </View>
+              {/* KAYIT MODU: Ad Soyad + E-posta + Telefon No tek hesapta birleşir */}
+              {mode === 'register' && (
+                <>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>Ad Soyad *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Örn: Dilara Toraman"
+                      placeholderTextColor="#998"
+                      value={fullName}
+                      onChangeText={setFullName}
+                    />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>E-posta Adresi *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="ornek@mail.com"
+                      placeholderTextColor="#998"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      value={regEmail}
+                      onChangeText={setRegEmail}
+                    />
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.inputLabel}>Telefon Numarası *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="05XX XXX XX XX"
+                      placeholderTextColor="#998"
+                      keyboardType="phone-pad"
+                      value={regPhone}
+                      onChangeText={setRegPhone}
+                    />
+                  </View>
+                </>
+              )}
 
               {/* Şifre */}
               <View style={styles.fieldGroup}>
@@ -479,7 +513,7 @@ export default function AuthScreen({ onAuthSuccess }) {
               <Text style={styles.subCardDesc}>
                 Başkasının adına hesap açılmasını önlemek için{' '}
                 <Text style={{ fontWeight: '800', color: colors.burgundyDark }}>
-                  {identifier}
+                  {regPhone} ({regEmail})
                 </Text>{' '}
                 bilgisine 6 haneli doğrulama kodu gönderildi.
               </Text>

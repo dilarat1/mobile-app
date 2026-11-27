@@ -41,6 +41,10 @@ export default function App() {
       }
     }
     initStorage();
+    const unsubscribe = storageService.subscribeToCapsules((liveList) => {
+      setCapsulesList(liveList);
+    });
+    return () => unsubscribe();
   }, []);
 
   // Oturumu kapat
@@ -52,49 +56,35 @@ export default function App() {
 
   // Yeni kapsül eklendiğinde
   const handleCapsuleCreated = async (newCapsule) => {
-    const updated = [newCapsule, ...capsulesList];
+    const updated = await storageService.addCapsule(newCapsule, capsulesList);
     setCapsulesList(updated);
-    await storageService.saveCapsules(updated);
     setCurrentTab('feed');
   };
 
   // Kapsül mührü açıldığında
   const handleUnlockCapsule = async (capsuleId) => {
-    const updated = capsulesList.map((c) =>
-      c.id === capsuleId ? { ...c, isUnlocked: true } : c
+    const updated = await storageService.updateCapsule(
+      capsuleId,
+      { isUnlocked: true },
+      capsulesList
     );
     setCapsulesList(updated);
     if (selectedCapsule && selectedCapsule.id === capsuleId) {
       setSelectedCapsule({ ...selectedCapsule, isUnlocked: true });
     }
-    await storageService.saveCapsules(updated);
   };
 
   // Kapsüle anı eklendiğinde
   const handleAddMemory = async (capsuleId, newMemory) => {
-    const updated = capsulesList.map((c) => {
-      if (c.id === capsuleId) {
-        const memories = c.memories ? [...c.memories, newMemory] : [newMemory];
-        return {
-          ...c,
-          memoryCount: memories.length,
-          memories: memories,
-        };
-      }
-      return c;
-    });
+    const target = capsulesList.find((c) => c.id === capsuleId);
+    const memories = target?.memories ? [...target.memories, newMemory] : [newMemory];
+    const updates = { memoryCount: memories.length, memories };
+
+    const updated = await storageService.updateCapsule(capsuleId, updates, capsulesList);
     setCapsulesList(updated);
     if (selectedCapsule && selectedCapsule.id === capsuleId) {
-      const memories = selectedCapsule.memories
-        ? [...selectedCapsule.memories, newMemory]
-        : [newMemory];
-      setSelectedCapsule({
-        ...selectedCapsule,
-        memoryCount: memories.length,
-        memories: memories,
-      });
+      setSelectedCapsule({ ...selectedCapsule, ...updates });
     }
-    await storageService.saveCapsules(updated);
   };
 
   const wrapForWeb = (node) => {
