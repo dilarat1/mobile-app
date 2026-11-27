@@ -10,7 +10,7 @@ import {
 import { colors } from '../theme/colors';
 import GinghamHeader from '../components/GinghamHeader';
 
-export default function InboxScreen({ capsules, onSelectCapsule }) {
+export default function InboxScreen({ capsules, currentUser, onSelectCapsule, onLogout }) {
   const [activeTab, setActiveTab] = useState('group'); // 'group' or 'solo'
 
   // Kullanıcının grupları ve kişisel kapsülleri
@@ -25,6 +25,24 @@ export default function InboxScreen({ capsules, onSelectCapsule }) {
         title="Özelim & Grup Kutusu"
         subtitle="💌 Sana ve gruplarına mühürlenen hatıralar 💌"
       />
+
+      {/* Aktif Kullanıcı & Çıkış Çubuğu */}
+      {currentUser && (
+        <View style={styles.accountBar}>
+          <View style={styles.accountInfo}>
+            <Image source={{ uri: currentUser.avatar }} style={styles.accountAvatar} />
+            <View>
+              <Text style={styles.accountName}>{currentUser.name}</Text>
+              <Text style={styles.accountId}>{currentUser.identifier}</Text>
+            </View>
+          </View>
+          {onLogout && (
+            <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+              <Text style={styles.logoutBtnText}>Çıkış Yap</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* İki Sekmeli Seçici (Grup vs Kişisel) */}
       <View style={styles.tabSelector}>
@@ -319,5 +337,52 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 30,
     marginTop: 4,
+  },
+  accountBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.cardBg,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  accountInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  accountAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: colors.burgundy,
+  },
+  accountName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.burgundyDark,
+  },
+  accountId: {
+    fontSize: 10,
+    color: colors.textMuted,
+  },
+  logoutBtn: {
+    backgroundColor: '#F7EDEE',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5B8BE',
+  },
+  logoutBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.burgundy,
   },
 });

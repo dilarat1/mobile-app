@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
@@ -12,17 +11,16 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { colors } from './src/theme/colors';
 import { storageService } from './src/services/storageService';
+import AuthScreen from './src/screens/AuthScreen';
 import FeedScreen from './src/screens/FeedScreen';
 import CreateScreen from './src/screens/CreateScreen';
 import InboxScreen from './src/screens/InboxScreen';
 import CapsuleDetailModal from './src/screens/CapsuleDetailModal';
-import GinghamHeader from './src/components/GinghamHeader';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('feed'); // 'feed', 'create', 'inbox'
   const [capsulesList, setCapsulesList] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
-  const [nameInput, setNameInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCapsule, setSelectedCapsule] = useState(null);
 
@@ -45,19 +43,11 @@ export default function App() {
     initStorage();
   }, []);
 
-  // Kullanıcı adını kaydet
-  const handleSaveUser = async () => {
-    const trimmed = nameInput.trim();
-    if (!trimmed) return;
-    const profile = {
-      name: trimmed,
-      avatar:
-        'https://ui-avatars.com/api/?name=' +
-        encodeURIComponent(trimmed) +
-        '&background=731C28&color=FAF7F2',
-    };
-    setCurrentUser(profile);
-    await storageService.saveUserProfile(profile);
+  // Oturumu kapat
+  const handleLogout = async () => {
+    await storageService.logoutUser();
+    setCurrentUser(null);
+    setCurrentTab('feed');
   };
 
   // Yeni kapsül eklendiğinde
@@ -131,41 +121,12 @@ export default function App() {
     );
   }
 
-  // İlk girişte gerçek kullanıcı adını sor (Sahte profil yok)
+  // Kayıtlı / giriş yapmış kullanıcı yoksa Auth ekranını göster
   if (!currentUser) {
     return wrapForWeb(
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
-        <View style={styles.contentArea}>
-          <GinghamHeader
-            title="TimeCapsule"
-            subtitle="✨ Gerçek Anılar • Gerçek Dostluklar ✨"
-          />
-          <View style={styles.onboardingCard}>
-            <Text style={styles.onboardingIcon}>🎀</Text>
-            <Text style={styles.onboardingTitle}>Hoş Geldin!</Text>
-            <Text style={styles.onboardingSub}>
-              Kapsüllerde ve grup anılarında görünecek adını yazarak başla:
-            </Text>
-            <TextInput
-              style={styles.onboardingInput}
-              placeholder="Adın (Örn: Dilara)"
-              placeholderTextColor="#998"
-              value={nameInput}
-              onChangeText={setNameInput}
-            />
-            <TouchableOpacity
-              style={[
-                styles.onboardingBtn,
-                !nameInput.trim() && { opacity: 0.5 },
-              ]}
-              onPress={handleSaveUser}
-              disabled={!nameInput.trim()}
-            >
-              <Text style={styles.onboardingBtnText}>Başla ✨</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <AuthScreen onAuthSuccess={(user) => setCurrentUser(user)} />
       </SafeAreaView>
     );
   }
@@ -197,7 +158,9 @@ export default function App() {
         {currentTab === 'inbox' && (
           <InboxScreen
             capsules={capsulesList}
+            currentUser={currentUser}
             onSelectCapsule={(cap) => setSelectedCapsule(cap)}
+            onLogout={handleLogout}
           />
         )}
       </View>
