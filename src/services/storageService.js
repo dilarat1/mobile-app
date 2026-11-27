@@ -1,9 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
+  sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 import {
   collection,
@@ -82,7 +86,7 @@ export const storageService = {
     return { exists: false };
   },
 
-  // Birleşik Kayıt: E-posta + Telefon tek hesapta bağlanır
+  // Birleşik Kayıt: Firebase varsa gerçek doğrulama e-postası gönderir!
   async registerUser({ fullName, email, phone, password }) {
     const normEmail = email.trim().toLowerCase();
     const normPhone = normalizePhone(phone);
@@ -100,6 +104,9 @@ export const storageService = {
     if (isFirebaseConfigured && auth && db) {
       try {
         const cred = await createUserWithEmailAndPassword(auth, normEmail, password);
+        // Gerçek e-posta doğrulama linki gönder!
+        await sendEmailVerification(cred.user);
+
         const userObj = {
           id: cred.user.uid,
           name: fullName.trim(),
@@ -111,9 +118,11 @@ export const storageService = {
           createdAt: new Date().toISOString(),
         };
         await setDoc(doc(db, 'users', cred.user.uid), userObj);
-        await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(userObj));
-        return { ok: true, user: userObj };
+        return { ok: true, user: userObj, requiresEmailVerification: true };
       } catch (err) {
+        if (err.code === 'auth/email-already-in-use') {
+          return { ok: false, error: 'Bu e-posta adresi zaten kayıtlı.' };
+        }
         return { ok: false, error: err.message || 'Firebase kayıt hatası.' };
       }
     }
@@ -133,7 +142,49 @@ export const storageService = {
 
     await AsyncStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify([...users, newUser]));
     await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(newUser));
-    return { ok: true, user: newUser };
+    return { ok: true, user: newUser, requiresEmailVerification: false };
+  },
+
+  // E-posta doğrulama linkine tıklandı mı kontrol et
+  async checkEmailVerified() {
+    if (!isFirebaseConfigured || !auth || !auth.currentUser) {
+      return { ok: false, error: 'Aktif kayıt oturumu bulunamadı.' };
+    }
+    try {
+      await auth.currentUser.reload();
+      if (!auth.currentUser.emailVerified) {
+        return {
+          ok: false,
+          error:
+            'E-postan henüz doğrulanmadı! Gelen kutuna (veya Spam klasörüne) gelen linke tıkladıktan sonra tekrar dene.',
+        };
+      }
+      const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      const userData = userDoc.exists()
+        ? userDoc.data()
+        : {
+            id: auth.currentUser.uid,
+            name: auth.currentUser.email.split('@')[0],
+            email: auth.currentUser.email,
+          };
+      await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(userData));
+      return { ok: true, user: userData };
+    } catch (err) {
+      return { ok: false, error: 'Doğrulama kontrol edilirken hata oluştu.' };
+    }
+  },
+
+  // Doğrulama mailini tekrar gönder
+  async resendVerificationEmail() {
+    if (!isFirebaseConfigured || !auth || !auth.currentUser) {
+      return { ok: false, error: 'Aktif kullanıcı bulunamadı.' };
+    }
+    try {
+      await sendEmailVerification(auth.currentUser);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: 'Biraz bekleyip tekrar dene.' };
+    }
   },
 
   // Giriş yap: E-posta VEYA Telefon No ile aynı tek hesaba girer
@@ -147,7 +198,6 @@ export const storageService = {
       try {
         let targetEmail = normEmail;
         if (!isEmail) {
-          // Telefon numarasından bağlı e-postayı bul
           const usersRef = collection(db, 'users');
           const snap = await getDocs(query(usersRef, where('phone', '==', normPhone)));
           if (snap.empty) {
@@ -157,6 +207,15 @@ export const storageService = {
         }
 
         const cred = await signInWithEmailAndPassword(auth, targetEmail, password);
+        if (!cred.user.emailVerified) {
+          return {
+            ok: false,
+            needsVerification: true,
+            email: targetEmail,
+            error: 'E-posta adresin henüz doğrulanmamış. Lütfen mailindeki doğrulama linkine tıkla.',
+          };
+        }
+
         const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
         const userData = userDoc.exists()
           ? userDoc.data()
@@ -196,7 +255,46 @@ export const storageService = {
     return { ok: true, user: found };
   },
 
-  // Google hesabı ile bağlan
+  // Gerçek Google OAuth (Web'de popup açar) veya manuel fallback
+  async loginWithGoogleReal() {
+    if (isFirebaseConfigured && auth && db && Platform.OS === 'web') {
+      try {
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        const gUser = result.user;
+        const userRef = doc(db, 'users', gUser.uid);
+        const existingSnap = await getDoc(userRef);
+
+        let userData;
+        if (existingSnap.exists()) {
+          userData = existingSnap.data();
+        } else {
+          userData = {
+            id: gUser.uid,
+            name: gUser.displayName || gUser.email.split('@')[0],
+            email: gUser.email.toLowerCase(),
+            phone: '',
+            method: 'google',
+            avatar:
+              gUser.photoURL ||
+              'https://ui-avatars.com/api/?name=' +
+                encodeURIComponent(gUser.displayName || 'User') +
+                '&background=731C28&color=FAF7F2',
+            createdAt: new Date().toISOString(),
+          };
+          await setDoc(userRef, userData);
+        }
+
+        await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(userData));
+        return { ok: true, user: userData };
+      } catch (err) {
+        return { ok: false, error: err.message || 'Google ile giriş iptal edildi.' };
+      }
+    }
+    return { ok: false, fallbackRequired: true };
+  },
+
+  // Google hesabı ile bağlan (Mobil fallback)
   async loginWithGoogle({ email, fullName }) {
     const normEmail = email.trim().toLowerCase();
     const displayName = fullName.trim() || normEmail.split('@')[0];

@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { colors } from '../theme/colors';
+import { isFirebaseConfigured } from '../config/firebase';
 import { storageService } from '../services/storageService';
 import GinghamHeader from '../components/GinghamHeader';
 
@@ -88,7 +89,7 @@ export default function AuthScreen({ onAuthSuccess }) {
     onAuthSuccess(res.user);
   };
 
-  // Kayıt Ol - 1. Adım: E-posta + Telefon bilgilerini doğrula ve 6 haneli doğrulama kodu gönder
+  // Kayıt Ol - 1. Adım: Bilgileri doğrula ve gerçek doğrulama gönder
   const handleSendRegisterOtp = async () => {
     clearMessages();
     if (fullName.trim().length < 2) {
@@ -123,18 +124,46 @@ export default function AuthScreen({ onAuthSuccess }) {
       return;
     }
 
+    // Firebase aktifse doğrudan gerçek doğrulama e-postası gönder!
+    if (isFirebaseConfigured) {
+      const res = await storageService.registerUser({
+        fullName,
+        email: regEmail,
+        phone: regPhone,
+        password,
+      });
+      if (!res.ok) {
+        setErrorMsg(res.error);
+        return;
+      }
+      setRegisterStep(2);
+      setSuccessMsg(
+        `✉️ ${regEmail.trim()} adresine gerçek doğrulama bağlantısı gönderdik! Gelen kutunu (ve Spam klasörünü) kontrol et.`
+      );
+      return;
+    }
+
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     setRegisterSentOtp(otp);
     setRegisterOtpInput('');
     setRegisterStep(2);
-    setSuccessMsg(
-      `📱 ${regPhone.trim()} ve ✉️ ${regEmail.trim()} için doğrulama kodu gönderildi! (Test Kodu: ${otp})`
-    );
+    setSuccessMsg(`Doğrulama kodu gönderildi (Yerel Mod Kodu: ${otp})`);
   };
 
-  // Kayıt Ol - 2. Adım: Doğrulama kodunu kontrol et ve tek birleşik hesabı aç
+  // Kayıt Ol - 2. Adım: Doğrulamayı kontrol et
   const handleVerifyAndRegister = async () => {
     clearMessages();
+
+    if (isFirebaseConfigured) {
+      const res = await storageService.checkEmailVerified();
+      if (!res.ok) {
+        setErrorMsg(res.error);
+        return;
+      }
+      onAuthSuccess(res.user);
+      return;
+    }
+
     if (registerOtpInput.trim() !== registerSentOtp) {
       setErrorMsg('Doğrulama kodu hatalı! Kod onaylanmadan hesap oluşturulamaz.');
       return;
@@ -153,16 +182,31 @@ export default function AuthScreen({ onAuthSuccess }) {
     onAuthSuccess(res.user);
   };
 
-  // Şifremi Unuttum - 1. Adım: Kod Gönder
+  // Şifremi Unuttum - 1. Adım: Kod veya Reset Maili Gönder
   const handleSendResetCode = async () => {
     clearMessages();
     if (!identifier.trim()) {
       setErrorMsg('Lütfen kayıtlı e-posta veya telefon numaranı gir.');
       return;
     }
+
+    if (isFirebaseConfigured && identifier.includes('@')) {
+      const res = await storageService.resetPassword({ identifier });
+      if (!res.ok) {
+        setErrorMsg(res.error);
+        return;
+      }
+      setSuccessMsg(
+        `✉️ ${identifier.trim()} adresine şifre sıfırlama bağlantısı gönderildi! Mailini kontrol et.`
+      );
+      return;
+    }
+
     const users = await storageService.getRegisteredUsers();
     const found = users.find(
-      (u) => u.identifier.toLowerCase() === identifier.trim().toLowerCase()
+      (u) =>
+        u.email === identifier.trim().toLowerCase() ||
+        u.phone === identifier.replace(/\D/g, '').slice(-10)
     );
     if (!found) {
       setErrorMsg('Bu bilgiyle kayıtlı bir hesap bulunamadı.');
@@ -175,7 +219,7 @@ export default function AuthScreen({ onAuthSuccess }) {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setSentCode(code);
     setForgotStep(2);
-    setSuccessMsg(`Doğrulama kodu gönderildi! (Test Kodu: ${code})`);
+    setSuccessMsg(`Doğrulama kodu gönderildi (Yerel Mod Kodu: ${code})`);
   };
 
   // Şifremi Unuttum - 2. Adım: Şifreyi Güncelle
@@ -476,9 +520,16 @@ export default function AuthScreen({ onAuthSuccess }) {
               {/* Google ile Bağlan Butonu */}
               <TouchableOpacity
                 style={styles.googleBtn}
-                onPress={() => {
-                  setMode('google');
+                onPress={async () => {
                   clearMessages();
+                  const res = await storageService.loginWithGoogleReal();
+                  if (res.ok) {
+                    onAuthSuccess(res.user);
+                  } else if (res.fallbackRequired) {
+                    setMode('google');
+                  } else if (res.error) {
+                    setErrorMsg(res.error);
+                  }
                 }}
                 activeOpacity={0.8}
               >
@@ -506,41 +557,80 @@ export default function AuthScreen({ onAuthSuccess }) {
             </View>
           )}
 
-          {/* ================= 1B. KAYIT DOĞRULAMA (OTP) EKRANI ================= */}
+          {/* ================= 1B. KAYIT DOĞRULAMA EKRANI ================= */}
           {mode === 'register' && registerStep === 2 && (
             <View>
-              <Text style={styles.subCardTitle}>🔐 Hesap Doğrulama</Text>
+              <Text style={styles.subCardTitle}>
+                {isFirebaseConfigured ? '✉️ E-postanı Doğrula' : '🔐 Hesap Doğrulama'}
+              </Text>
               <Text style={styles.subCardDesc}>
-                Başkasının adına hesap açılmasını önlemek için{' '}
-                <Text style={{ fontWeight: '800', color: colors.burgundyDark }}>
-                  {regPhone} ({regEmail})
-                </Text>{' '}
-                bilgisine 6 haneli doğrulama kodu gönderildi.
+                {isFirebaseConfigured ? (
+                  <>
+                    <Text style={{ fontWeight: '800', color: colors.burgundyDark }}>
+                      {regEmail}
+                    </Text>{' '}
+                    adresine gerçek doğrulama bağlantısı gönderildi. Gelen kutundaki (veya Spam) linke tıkladıktan sonra aşağıdaki butona bas.
+                  </>
+                ) : (
+                  <>
+                    <Text style={{ fontWeight: '800', color: colors.burgundyDark }}>
+                      {regPhone} ({regEmail})
+                    </Text>{' '}
+                    bilgisine 6 haneli doğrulama kodu gönderildi.
+                  </>
+                )}
               </Text>
 
-              <Text style={styles.inputLabel}>6 Haneli Doğrulama Kodu *</Text>
-              <TextInput
-                style={[styles.input, { textAlign: 'center', fontSize: 18, letterSpacing: 6, fontWeight: '800' }]}
-                placeholder="000000"
-                placeholderTextColor="#998"
-                keyboardType="number-pad"
-                maxLength={6}
-                value={registerOtpInput}
-                onChangeText={setRegisterOtpInput}
-              />
+              {!isFirebaseConfigured && (
+                <>
+                  <Text style={styles.inputLabel}>6 Haneli Doğrulama Kodu *</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      { textAlign: 'center', fontSize: 18, letterSpacing: 6, fontWeight: '800' },
+                    ]}
+                    placeholder="000000"
+                    placeholderTextColor="#998"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    value={registerOtpInput}
+                    onChangeText={setRegisterOtpInput}
+                  />
+                </>
+              )}
 
               <TouchableOpacity
                 style={[styles.primaryBtn, { marginTop: 14 }]}
                 onPress={handleVerifyAndRegister}
               >
-                <Text style={styles.primaryBtnText}>Kodu Doğrula ve Hesabı Aç ✓</Text>
+                <Text style={styles.primaryBtnText}>
+                  {isFirebaseConfigured
+                    ? 'Linke Tıkladım, Doğrula ✓'
+                    : 'Kodu Doğrula ve Hesabı Aç ✓'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.switchPrompt}
-                onPress={handleSendRegisterOtp}
+                onPress={async () => {
+                  clearMessages();
+                  if (isFirebaseConfigured) {
+                    const res = await storageService.resendVerificationEmail();
+                    if (res.ok) {
+                      setSuccessMsg('Doğrulama maili tekrar gönderildi!');
+                    } else {
+                      setErrorMsg(res.error);
+                    }
+                  } else {
+                    handleSendRegisterOtp();
+                  }
+                }}
               >
-                <Text style={styles.switchPromptText}>🔄 Kodu Tekrar Gönder</Text>
+                <Text style={styles.switchPromptText}>
+                  {isFirebaseConfigured
+                    ? '🔄 Doğrulama Mailini Tekrar Gönder'
+                    : '🔄 Kodu Tekrar Gönder'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -551,7 +641,7 @@ export default function AuthScreen({ onAuthSuccess }) {
                 }}
               >
                 <Text style={[styles.switchPromptText, { color: colors.textSecondary }]}>
-                  ← Bilgileri Düzenle
+                  ← Geri Dön
                 </Text>
               </TouchableOpacity>
             </View>
