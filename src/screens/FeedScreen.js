@@ -112,11 +112,22 @@ export default function FeedScreen({ capsules: propCapsules, onNavigateToCreate,
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📜</Text>
-            <Text style={styles.emptyTitle}>Henüz Kapsül Bulunamadı</Text>
+            <Text style={styles.emptyIcon}>🎀</Text>
+            <Text style={styles.emptyTitle}>Akışın Henüz Boş</Text>
             <Text style={styles.emptySub}>
-              Filtrelerinizi değiştirebilir veya yeni bir kapsül oluşturabilirsiniz.
+              {capsules.length === 0
+                ? 'Arkadaşlarınla ilk gerçek zaman kapsülünü oluşturup anılarını mühürlemeye başla!'
+                : 'Arama veya filtrelere uygun kapsül bulunamadı.'}
             </Text>
+            {capsules.length === 0 && onNavigateToCreate && (
+              <TouchableOpacity
+                style={styles.emptyCtaBtn}
+                onPress={onNavigateToCreate}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.emptyCtaText}>＋ İlk Kapsülü Oluştur ✨</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
@@ -207,5 +218,20 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: 6,
+    lineHeight: 18,
+  },
+  emptyCtaBtn: {
+    marginTop: 18,
+    backgroundColor: colors.burgundy,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: colors.goldStar,
+  },
+  emptyCtaText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

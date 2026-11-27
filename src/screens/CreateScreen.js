@@ -8,24 +8,30 @@ import {
   StyleSheet,
   Switch,
   Alert,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../theme/colors';
 import GinghamHeader from '../components/GinghamHeader';
 
-export default function CreateScreen({ onCapsuleCreated }) {
+export default function CreateScreen({ currentUser, onCapsuleCreated }) {
+  const userName = currentUser?.name || 'Kullanıcı';
+  const userAvatar = currentUser?.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userName) + '&background=731C28&color=FAF7F2';
+
   // 1. Temel Bilgiler
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [isGroup, setIsGroup] = useState(true);
+  const [isGroup, setIsGroup] = useState(false);
   const [friendName, setFriendName] = useState('');
-  const [collaborators, setCollaborators] = useState(['Dilara T. (Sen)', 'Melis K.', 'Emre B.']);
+  const [collaborators, setCollaborators] = useState([userName]);
 
   // 2. Modüler Kilit State'leri
   const [timeLockEnabled, setTimeLockEnabled] = useState(true);
-  const [selectedTimePreset, setSelectedTimePreset] = useState('mezuniyet'); // '1hafta', 'final', '1yil', 'mezuniyet'
-  
+  const [selectedTimePreset, setSelectedTimePreset] = useState('1hafta');
+  const [customTimeLabel, setCustomTimeLabel] = useState('');
+
   const [locationLockEnabled, setLocationLockEnabled] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState('İÜ Beyazıt Kampüsü / Rektörlük Bahçesi');
+  const [locationName, setLocationName] = useState('');
 
   const [riddleLockEnabled, setRiddleLockEnabled] = useState(false);
   const [riddleQuestion, setRiddleQuestion] = useState('');
@@ -34,26 +40,46 @@ export default function CreateScreen({ onCapsuleCreated }) {
 
   // 3. İlk Anı / Scrapbook Öğesi
   const [memoryType, setMemoryType] = useState('polaroid'); // 'polaroid', 'cassette', 'postit'
+  const [pickedImageUri, setPickedImageUri] = useState(null);
   const [polaroidCaption, setPolaroidCaption] = useState('');
   const [tapeColor, setTapeColor] = useState(colors.washiKraft);
   const [cassetteTitle, setCassetteTitle] = useState('');
   const [postItContent, setPostItContent] = useState('');
   const [postItColor, setPostItColor] = useState('#FFF6D1');
 
+  // Galeriden/Bilgisayardan gerçek fotoğraf seçme
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPickedImageUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      Alert.alert('Hata', 'Fotoğraf seçilirken bir sorun oluştu.');
+    }
+  };
+
   // Arkadaş ekleme
   const handleAddFriend = () => {
-    if (!friendName.trim()) return;
-    if (collaborators.includes(friendName.trim())) {
-      Alert.alert('Uyarı', 'Bu arkadaş zaten ekli!');
+    const trimmed = friendName.trim();
+    if (!trimmed) return;
+    if (collaborators.includes(trimmed)) {
+      Alert.alert('Uyarı', 'Bu kişi zaten ekli!');
       return;
     }
-    setCollaborators([...collaborators, friendName.trim()]);
+    setCollaborators([...collaborators, trimmed]);
     setFriendName('');
   };
 
   // Arkadaş silme
   const handleRemoveFriend = (name) => {
-    if (name.includes('(Sen)')) return;
+    if (name === userName) return;
     setCollaborators(collaborators.filter((c) => c !== name));
   };
 
@@ -67,15 +93,32 @@ export default function CreateScreen({ onCapsuleCreated }) {
     return list.join(' + ');
   };
 
+  // Formu sıfırla
+  const resetForm = () => {
+    setTitle('');
+    setDescription('');
+    setFriendName('');
+    setCollaborators([userName]);
+    setCustomTimeLabel('');
+    setLocationName('');
+    setRiddleQuestion('');
+    setRiddleAnswer('');
+    setRiddleHint('');
+    setPickedImageUri(null);
+    setPolaroidCaption('');
+    setCassetteTitle('');
+    setPostItContent('');
+  };
+
   // Kapsülü Mühürle & Kaydet
   const handleSealCapsule = () => {
     if (!title.trim()) {
-      Alert.alert('Eksik Bilgi', 'Lütfen kapsülüne bir başlık ver!');
+      Alert.alert('Eksik Bilgi', 'Lütfen kapsülüne bir başlık yaz!');
       return;
     }
 
-    if (!timeLockEnabled && !locationLockEnabled && !riddleLockEnabled) {
-      Alert.alert('Kilit Seçimi', 'Lütfen en az bir kilit türü (Zaman, Mekan veya Şifre) seç!');
+    if (locationLockEnabled && !locationName.trim()) {
+      Alert.alert('Eksik Bilgi', 'Mekan kilidi seçtiysen lütfen açılacağı yeri yaz.');
       return;
     }
 
@@ -84,69 +127,90 @@ export default function CreateScreen({ onCapsuleCreated }) {
       return;
     }
 
-    // Seçilen zaman etiketini belirleme
     const timeLabels = {
-      '1hafta': '7 Gün Sonra',
-      'final': 'Final Sınavları Sonu (15 Ocak 2025)',
-      '1yil': '1 Yıl Sonra (1 Ocak 2026)',
-      'mezuniyet': 'Mezuniyet Günü (20 Haziran 2027)',
+      '1gun': '1 Gün Sonra',
+      '1hafta': '1 Hafta Sonra',
+      '1ay': '1 Ay Sonra',
+      '1yil': '1 Yıl Sonra',
     };
+
+    const resolvedTimeLabel =
+      selectedTimePreset === 'ozel'
+        ? customTimeLabel.trim() || 'Belirlenen Tarih'
+        : timeLabels[selectedTimePreset];
+
+    const todayStr = new Date().toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
 
     // İlk anıyı hazırla
     const initialMemories = [];
-    if (memoryType === 'polaroid') {
+    if (memoryType === 'polaroid' && (pickedImageUri || polaroidCaption.trim())) {
       initialMemories.push({
         id: `mem_${Date.now()}_1`,
         type: 'polaroid',
-        image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600',
-        caption: polaroidCaption || 'Kapsülün ilk polaroid karesi ✨',
-        date: 'Bugün',
+        image: pickedImageUri || 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600',
+        caption: polaroidCaption.trim() || 'Anı karesi ✨',
+        date: todayStr,
         rotation: '-2deg',
         tapeColor: tapeColor,
       });
-    } else if (memoryType === 'cassette') {
+    } else if (memoryType === 'cassette' && cassetteTitle.trim()) {
       initialMemories.push({
         id: `mem_${Date.now()}_1`,
         type: 'cassette',
-        title: cassetteTitle || 'Geleceğe İlk Ses Mesajı 🎙️',
-        duration: '01:15',
-        author: 'Dilara T.',
+        title: cassetteTitle.trim(),
+        duration: '00:45',
+        author: userName,
       });
-    } else if (memoryType === 'postit') {
+    } else if (memoryType === 'postit' && postItContent.trim()) {
       initialMemories.push({
         id: `mem_${Date.now()}_1`,
         type: 'postit',
-        content: postItContent || 'Bu kapsülü açtığımız gün umarım hepimiz çok mutluyuzdur! ✨',
-        author: 'Dilara T.',
+        content: postItContent.trim(),
+        author: userName,
         color: postItColor,
         pinColor: colors.pinRed,
       });
     }
 
+    const isInitiallyUnlocked = !timeLockEnabled && !locationLockEnabled && !riddleLockEnabled;
+
     const newCapsule = {
       id: `cap_${Date.now()}`,
       title: title.trim(),
-      description: description.trim() || 'Bu kapsülde dostluklar ve geleceğe saklanan anılar var...',
+      description: description.trim() || 'Geleceğe bırakılan özel bir kapsül.',
       author: {
-        name: 'Dilara T.',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        name: userName,
+        avatar: userAvatar,
       },
-      createdAt: 'Bugün',
+      createdAt: todayStr,
       isPublic: true,
       isGroup: isGroup,
-      collaborators: isGroup ? collaborators : ['Dilara T.'],
+      collaborators: isGroup ? collaborators : [userName],
       collaboratorCount: isGroup ? collaborators.length : 1,
       lockType: 'custom',
       locks: {
         time: {
           enabled: timeLockEnabled,
-          label: timeLabels[selectedTimePreset] || 'İleri bir tarih',
-          remainingDays: selectedTimePreset === '1hafta' ? 7 : selectedTimePreset === 'final' ? 51 : selectedTimePreset === '1yil' ? 365 : 572,
+          label: resolvedTimeLabel,
+          remainingDays:
+            selectedTimePreset === '1gun'
+              ? 1
+              : selectedTimePreset === '1hafta'
+              ? 7
+              : selectedTimePreset === '1ay'
+              ? 30
+              : selectedTimePreset === '1yil'
+              ? 365
+              : null,
         },
         location: {
           enabled: locationLockEnabled,
-          name: selectedLocation,
-          distanceMeters: 350,
+          name: locationName.trim(),
+          distanceMeters: 0,
           isNearby: false,
         },
         riddle: {
@@ -157,21 +221,23 @@ export default function CreateScreen({ onCapsuleCreated }) {
           isSolved: false,
         },
       },
-      isUnlocked: false,
+      isUnlocked: isInitiallyUnlocked,
       memoryCount: initialMemories.length,
-      previewCover: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600',
-      tag: isGroup ? 'Grup Kapsülü • 👥 Ortak' : 'Özel Kapsül • 🔒 Kişisel',
+      previewCover:
+        pickedImageUri ||
+        'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600',
+      tag: isGroup ? 'Grup Kapsülü • 👥 Ortak' : 'Kişisel Kapsül • 🔒 Özel',
       memories: initialMemories,
     };
 
+    resetForm();
     if (onCapsuleCreated) {
       onCapsuleCreated(newCapsule);
     }
 
     Alert.alert(
-      '🎀 Kapsül Mühürlendi!',
-      `"${newCapsule.title}" başarıyla kilitlendi ve Akış'a eklendi!`,
-      [{ text: 'Akışa Git', style: 'default' }]
+      isInitiallyUnlocked ? '✨ Kapsül Paylaşıldı!' : '🎀 Kapsül Mühürlendi!',
+      `"${newCapsule.title}" Akış'a eklendi.`
     );
   };
 
@@ -179,7 +245,7 @@ export default function CreateScreen({ onCapsuleCreated }) {
     <View style={styles.container}>
       <GinghamHeader
         title="Yeni Kapsül Oluştur"
-        subtitle="✨ Geleceğe mühürlenecek anını tasarla ✨"
+        subtitle={`✨ ${userName}, anını mühürle ✨`}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -196,7 +262,7 @@ export default function CreateScreen({ onCapsuleCreated }) {
           <Text style={styles.inputLabel}>Kapsül Başlığı *</Text>
           <TextInput
             style={styles.textInput}
-            placeholder="Örn: 🎓 YBS 2027 Mezuniyet Hatırası"
+            placeholder="Kapsülüne bir isim ver..."
             placeholderTextColor="#998"
             value={title}
             onChangeText={setTitle}
@@ -205,7 +271,7 @@ export default function CreateScreen({ onCapsuleCreated }) {
           <Text style={styles.inputLabel}>Açıklama / Mesaj</Text>
           <TextInput
             style={[styles.textInput, styles.textArea]}
-            placeholder="Bu kapsülde neler var? Geleceğe veya arkadaşlarına bir not bırak..."
+            placeholder="Geleceğe veya arkadaşlarına kısa bir not yaz..."
             placeholderTextColor="#998"
             value={description}
             onChangeText={setDescription}
@@ -216,11 +282,11 @@ export default function CreateScreen({ onCapsuleCreated }) {
           {/* Kapsül Türü Seçimi: Grup vs Tekil */}
           <View style={styles.switchRow}>
             <View style={styles.switchTextCol}>
-              <Text style={styles.switchTitle}>👥 Arkadaş Grubu Kapsülü (WhatsApp Tarzı)</Text>
+              <Text style={styles.switchTitle}>👥 Arkadaş Grubu Kapsülü</Text>
               <Text style={styles.switchSub}>
                 {isGroup
-                  ? 'Arkadaşların kilit açılana kadar bu kapsüle kendi anılarını ekleyebilir.'
-                  : 'Sadece sana özel, tek kişilik kişisel bir zaman kapsülü.'}
+                  ? 'Eklediğin arkadaşların da bu kapsüle anı bırakabilir.'
+                  : 'Sadece senin oluşturduğun tekil kapsül.'}
               </Text>
             </View>
             <Switch
@@ -234,11 +300,11 @@ export default function CreateScreen({ onCapsuleCreated }) {
           {/* Arkadaş Ekleme Alanı (Grup Seçildiyse) */}
           {isGroup && (
             <View style={styles.groupAddArea}>
-              <Text style={styles.inputLabel}>Grup Arkadaşlarını Dahil Et</Text>
+              <Text style={styles.inputLabel}>Arkadaşlarını Ekle</Text>
               <View style={styles.addFriendRow}>
                 <TextInput
                   style={[styles.textInput, styles.friendInput]}
-                  placeholder="Arkadaşının adı (Örn: Zeki Hoca)..."
+                  placeholder="Arkadaşının adını yaz..."
                   placeholderTextColor="#998"
                   value={friendName}
                   onChangeText={setFriendName}
@@ -248,12 +314,13 @@ export default function CreateScreen({ onCapsuleCreated }) {
                 </TouchableOpacity>
               </View>
 
-              {/* Ekli Arkadaşlar Çipleri */}
               <View style={styles.friendChipsWrap}>
                 {collaborators.map((c) => (
                   <View key={c} style={styles.friendChip}>
-                    <Text style={styles.friendChipText}>{c}</Text>
-                    {!c.includes('(Sen)') && (
+                    <Text style={styles.friendChipText}>
+                      {c === userName ? `${c} (Sen)` : c}
+                    </Text>
+                    {c !== userName && (
                       <TouchableOpacity onPress={() => handleRemoveFriend(c)}>
                         <Text style={styles.removeChipText}>✕</Text>
                       </TouchableOpacity>
@@ -267,9 +334,9 @@ export default function CreateScreen({ onCapsuleCreated }) {
 
         {/* 2. BÖLÜM: MODÜLER KİLİT ŞARTLARI */}
         <View style={styles.cardSection}>
-          <Text style={styles.sectionTitle}>2. Modüler Kilit Seçimi</Text>
+          <Text style={styles.sectionTitle}>2. Kilit Seçenekleri</Text>
           <Text style={styles.sectionSubtitle}>
-            İster sadece birini, ister ikisini, istersen üçünü birden seçebilirsin!
+            İstediğin kilitleri açıp kapatabilir, hepsini bir arada kullanabilirsin.
           </Text>
 
           {/* KİLİT 1: ZAMAN KİLİDİ */}
@@ -277,7 +344,7 @@ export default function CreateScreen({ onCapsuleCreated }) {
             <View style={styles.lockHeaderRow}>
               <View style={styles.lockTitleRow}>
                 <Text style={styles.lockIcon}>⏳</Text>
-                <Text style={styles.lockTitle}>Zaman Kilidi (Geri Sayım)</Text>
+                <Text style={styles.lockTitle}>Zaman Kilidi</Text>
               </View>
               <Switch
                 value={timeLockEnabled}
@@ -289,13 +356,14 @@ export default function CreateScreen({ onCapsuleCreated }) {
 
             {timeLockEnabled && (
               <View style={styles.lockDetails}>
-                <Text style={styles.presetLabel}>Açılış Tarihi Seç:</Text>
+                <Text style={styles.presetLabel}>Ne zaman açılsın?</Text>
                 <View style={styles.presetPillsRow}>
                   {[
+                    { id: '1gun', label: '1 Gün Sonra' },
                     { id: '1hafta', label: '1 Hafta Sonra' },
-                    { id: 'final', label: 'Final Sonu 🎓' },
-                    { id: '1yil', label: '1 Yıl Sonra 📅' },
-                    { id: 'mezuniyet', label: 'Mezuniyet 2027 🌟' },
+                    { id: '1ay', label: '1 Ay Sonra' },
+                    { id: '1yil', label: '1 Yıl Sonra' },
+                    { id: 'ozel', label: 'Özel Tarih' },
                   ].map((p) => (
                     <TouchableOpacity
                       key={p.id}
@@ -316,6 +384,15 @@ export default function CreateScreen({ onCapsuleCreated }) {
                     </TouchableOpacity>
                   ))}
                 </View>
+                {selectedTimePreset === 'ozel' && (
+                  <TextInput
+                    style={[styles.textInput, { marginTop: 8 }]}
+                    placeholder="Örn: 15 Haziran 2027, 18:00"
+                    placeholderTextColor="#998"
+                    value={customTimeLabel}
+                    onChangeText={setCustomTimeLabel}
+                  />
+                )}
               </View>
             )}
           </View>
@@ -325,7 +402,7 @@ export default function CreateScreen({ onCapsuleCreated }) {
             <View style={styles.lockHeaderRow}>
               <View style={styles.lockTitleRow}>
                 <Text style={styles.lockIcon}>📍</Text>
-                <Text style={styles.lockTitle}>Mekan Kilidi (Konum Şartı)</Text>
+                <Text style={styles.lockTitle}>Mekan Kilidi</Text>
               </View>
               <Switch
                 value={locationLockEnabled}
@@ -337,34 +414,14 @@ export default function CreateScreen({ onCapsuleCreated }) {
 
             {locationLockEnabled && (
               <View style={styles.lockDetails}>
-                <Text style={styles.presetLabel}>Açılacağı Konumu Seç:</Text>
-                {[
-                  'İÜ Beyazıt Kampüsü / Rektörlük Bahçesi',
-                  'YBS Bölümü / Amfi 2',
-                  'Beyazıt Sahaflar Çarşısı Tarihi Kapısı',
-                  'Kadıköy Rıhtım / Çay Bahçeleri',
-                ].map((loc) => (
-                  <TouchableOpacity
-                    key={loc}
-                    style={[
-                      styles.locationOption,
-                      selectedLocation === loc && styles.locationOptionActive,
-                    ]}
-                    onPress={() => setSelectedLocation(loc)}
-                  >
-                    <Text style={styles.locDot}>
-                      {selectedLocation === loc ? '◉' : '○'}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.locationOptionText,
-                        selectedLocation === loc && styles.locationOptionTextActive,
-                      ]}
-                    >
-                      {loc}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                <Text style={styles.inputLabel}>Açılacağı Mekan / Konum *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Örn: Moda Sahil, Okul Bahçesi..."
+                  placeholderTextColor="#998"
+                  value={locationName}
+                  onChangeText={setLocationName}
+                />
               </View>
             )}
           </View>
@@ -374,7 +431,7 @@ export default function CreateScreen({ onCapsuleCreated }) {
             <View style={styles.lockHeaderRow}>
               <View style={styles.lockTitleRow}>
                 <Text style={styles.lockIcon}>🧩</Text>
-                <Text style={styles.lockTitle}>Şifre / Bilmece Kilidi</Text>
+                <Text style={styles.lockTitle}>Şifre / Gizli Soru Kilidi</Text>
               </View>
               <Switch
                 value={riddleLockEnabled}
@@ -386,29 +443,29 @@ export default function CreateScreen({ onCapsuleCreated }) {
 
             {riddleLockEnabled && (
               <View style={styles.lockDetails}>
-                <Text style={styles.inputLabel}>Gizli Soru / Bilmece *</Text>
+                <Text style={styles.inputLabel}>Gizli Soru *</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Örn: İlk kahvemizi nerede içtik?"
+                  placeholder="Arkadaşlarının bileceği bir soru sor..."
                   placeholderTextColor="#998"
                   value={riddleQuestion}
                   onChangeText={setRiddleQuestion}
                 />
 
-                <Text style={styles.inputLabel}>Doğru Cevap (Kilidi Açan Şifre) *</Text>
+                <Text style={styles.inputLabel}>Doğru Cevap (Şifre) *</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Örn: Kadıköy Moda"
+                  placeholder="Kilidi açacak cevabı yaz..."
                   placeholderTextColor="#998"
                   value={riddleAnswer}
                   onChangeText={setRiddleAnswer}
                   autoCapitalize="none"
                 />
 
-                <Text style={styles.inputLabel}>İpucu (Opsiyonel)</Text>
+                <Text style={styles.inputLabel}>İpucu (İsteğe bağlı)</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Örn: Deniz kenarındaki o eski çay bahçesi..."
+                  placeholder="Küçük bir ipucu..."
                   placeholderTextColor="#998"
                   value={riddleHint}
                   onChangeText={setRiddleHint}
@@ -420,17 +477,16 @@ export default function CreateScreen({ onCapsuleCreated }) {
 
         {/* 3. BÖLÜM: İLK SCRAPBOOK ANISINI EKLE */}
         <View style={styles.cardSection}>
-          <Text style={styles.sectionTitle}>3. İlk Scrapbook Anısı (Taslak)</Text>
+          <Text style={styles.sectionTitle}>3. Anı Ekle</Text>
           <Text style={styles.sectionSubtitle}>
-            Kapsülün içine koyacağın ilk anıyı seç:
+            Kapsülünün içine koyacağın ilk parçayı hazırla:
           </Text>
 
-          {/* Anı Türü Seçimi */}
           <View style={styles.memoryTypeRow}>
             {[
-              { id: 'polaroid', label: '📸 Polaroid', icon: '📸' },
-              { id: 'cassette', label: '🎙️ Ses Kasedi', icon: '🎙️' },
-              { id: 'postit', label: '📌 Post-it Not', icon: '📌' },
+              { id: 'polaroid', label: '📸 Polaroid' },
+              { id: 'cassette', label: '🎙️ Ses Kasedi' },
+              { id: 'postit', label: '📌 Post-it Not' },
             ].map((m) => (
               <TouchableOpacity
                 key={m.id}
@@ -452,19 +508,30 @@ export default function CreateScreen({ onCapsuleCreated }) {
             ))}
           </View>
 
-          {/* Polaroid Formu */}
           {memoryType === 'polaroid' && (
             <View style={styles.memoryFormBox}>
-              <Text style={styles.inputLabel}>Polaroid Altı El Yazısı Açıklaması</Text>
+              <TouchableOpacity style={styles.pickPhotoBtn} onPress={handlePickImage}>
+                <Text style={styles.pickPhotoBtnText}>
+                  {pickedImageUri ? '📷 Fotoğrafı Değiştir' : '📷 Galeriden Fotoğraf Seç'}
+                </Text>
+              </TouchableOpacity>
+
+              {pickedImageUri && (
+                <View style={styles.pickedPreviewWrap}>
+                  <Image source={{ uri: pickedImageUri }} style={styles.pickedPreviewImg} />
+                </View>
+              )}
+
+              <Text style={styles.inputLabel}>Fotoğraf Altı Yazısı</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="Örn: Kampüs bahçesinde ilk günümüz... 🌿"
+                placeholder="Bu kareye bir not düş..."
                 placeholderTextColor="#998"
                 value={polaroidCaption}
                 onChangeText={setPolaroidCaption}
               />
 
-              <Text style={styles.inputLabel}>Washi Bant Rengi Seç:</Text>
+              <Text style={styles.inputLabel}>Washi Bant Rengi:</Text>
               <View style={styles.tapeColorsRow}>
                 {[
                   { name: 'Kraft', color: colors.washiKraft },
@@ -488,30 +555,25 @@ export default function CreateScreen({ onCapsuleCreated }) {
             </View>
           )}
 
-          {/* Ses Kasedi Formu */}
           {memoryType === 'cassette' && (
             <View style={styles.memoryFormBox}>
-              <Text style={styles.inputLabel}>Ses Kaydı Başlığı</Text>
+              <Text style={styles.inputLabel}>Kaset Başlığı</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="Örn: Ders Çıkışı Kahkaha Krizimiz 🎙️"
+                placeholder="Ses kaydına bir isim ver..."
                 placeholderTextColor="#998"
                 value={cassetteTitle}
                 onChangeText={setCassetteTitle}
               />
-              <Text style={styles.mockVoiceTip}>
-                🎙️ Mikrofon izniyle ses kaydı kapsüle iliştirilecek.
-              </Text>
             </View>
           )}
 
-          {/* Post-it Formu */}
           {memoryType === 'postit' && (
             <View style={styles.memoryFormBox}>
-              <Text style={styles.inputLabel}>Post-it Üzerine Yazılacak Not</Text>
+              <Text style={styles.inputLabel}>Post-it Notun</Text>
               <TextInput
                 style={[styles.textInput, styles.textArea]}
-                placeholder="Örn: Bu sınav da bitti ya, mezuniyet garanti artık! ✨"
+                placeholder="Notunu buraya yaz..."
                 placeholderTextColor="#998"
                 value={postItContent}
                 onChangeText={setPostItContent}
@@ -546,7 +608,7 @@ export default function CreateScreen({ onCapsuleCreated }) {
         {/* 4. MÜHÜRLE BUTONU */}
         <TouchableOpacity style={styles.sealButton} onPress={handleSealCapsule} activeOpacity={0.85}>
           <Text style={styles.sealButtonStar}>✦</Text>
-          <Text style={styles.sealButtonText}>Kapsülü Mühürle & Kilitle 🎀</Text>
+          <Text style={styles.sealButtonText}>Kapsülü Mühürle & Oluştur 🎀</Text>
           <Text style={styles.sealButtonStar}>✦</Text>
         </TouchableOpacity>
 
@@ -775,29 +837,6 @@ const styles = StyleSheet.create({
   presetPillTextActive: {
     color: '#FFF',
   },
-  locationOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  locationOptionActive: {
-    backgroundColor: 'rgba(115, 28, 40, 0.06)',
-    borderRadius: 6,
-    paddingHorizontal: 4,
-  },
-  locDot: {
-    fontSize: 14,
-    color: colors.burgundy,
-    marginRight: 6,
-  },
-  locationOptionText: {
-    fontSize: 12,
-    color: colors.textPrimary,
-  },
-  locationOptionTextActive: {
-    fontWeight: '700',
-    color: colors.burgundy,
-  },
   memoryTypeRow: {
     flexDirection: 'row',
     gap: 8,
@@ -827,6 +866,32 @@ const styles = StyleSheet.create({
   memoryFormBox: {
     marginTop: 6,
   },
+  pickPhotoBtn: {
+    backgroundColor: colors.parchment,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.burgundy,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  pickPhotoBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.burgundy,
+  },
+  pickedPreviewWrap: {
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  pickedPreviewImg: {
+    width: 180,
+    height: 135,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.cardBorder,
+  },
   tapeColorsRow: {
     flexDirection: 'row',
     gap: 8,
@@ -847,12 +912,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#333',
-  },
-  mockVoiceTip: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: 6,
   },
   sealButton: {
     backgroundColor: colors.burgundy,

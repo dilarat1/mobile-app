@@ -1,28 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Platform, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from './src/theme/colors';
-import { mockCapsules } from './src/data/mockCapsules';
 import { storageService } from './src/services/storageService';
 import FeedScreen from './src/screens/FeedScreen';
 import CreateScreen from './src/screens/CreateScreen';
 import InboxScreen from './src/screens/InboxScreen';
 import CapsuleDetailModal from './src/screens/CapsuleDetailModal';
+import GinghamHeader from './src/components/GinghamHeader';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('feed'); // 'feed', 'create', 'inbox'
-  const [capsulesList, setCapsulesList] = useState(mockCapsules);
+  const [capsulesList, setCapsulesList] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [nameInput, setNameInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCapsule, setSelectedCapsule] = useState(null);
 
-  // Uygulama açılışında AsyncStorage'dan kayıtlı verileri yükle
+  // Uygulama açılışında kullanıcı profilini ve gerçek kapsülleri yükle
   useEffect(() => {
     async function initStorage() {
       try {
-        const stored = await storageService.loadCapsules();
-        if (stored && stored.length > 0) {
-          setCapsulesList(stored);
-        }
+        const [storedUser, storedCapsules] = await Promise.all([
+          storageService.loadUserProfile(),
+          storageService.loadCapsules(),
+        ]);
+        if (storedUser) setCurrentUser(storedUser);
+        if (storedCapsules) setCapsulesList(storedCapsules);
       } catch (err) {
         console.warn('Storage init failed:', err);
       } finally {
@@ -31,6 +44,21 @@ export default function App() {
     }
     initStorage();
   }, []);
+
+  // Kullanıcı adını kaydet
+  const handleSaveUser = async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    const profile = {
+      name: trimmed,
+      avatar:
+        'https://ui-avatars.com/api/?name=' +
+        encodeURIComponent(trimmed) +
+        '&background=731C28&color=FAF7F2',
+    };
+    setCurrentUser(profile);
+    await storageService.saveUserProfile(profile);
+  };
 
   // Yeni kapsül eklendiğinde
   const handleCapsuleCreated = async (newCapsule) => {
@@ -42,12 +70,9 @@ export default function App() {
 
   // Kapsül mührü açıldığında
   const handleUnlockCapsule = async (capsuleId) => {
-    const updated = capsulesList.map((c) => {
-      if (c.id === capsuleId) {
-        return { ...c, isUnlocked: true };
-      }
-      return c;
-    });
+    const updated = capsulesList.map((c) =>
+      c.id === capsuleId ? { ...c, isUnlocked: true } : c
+    );
     setCapsulesList(updated);
     if (selectedCapsule && selectedCapsule.id === capsuleId) {
       setSelectedCapsule({ ...selectedCapsule, isUnlocked: true });
@@ -70,7 +95,9 @@ export default function App() {
     });
     setCapsulesList(updated);
     if (selectedCapsule && selectedCapsule.id === capsuleId) {
-      const memories = selectedCapsule.memories ? [...selectedCapsule.memories, newMemory] : [newMemory];
+      const memories = selectedCapsule.memories
+        ? [...selectedCapsule.memories, newMemory]
+        : [newMemory];
       setSelectedCapsule({
         ...selectedCapsule,
         memoryCount: memories.length,
@@ -80,12 +107,66 @@ export default function App() {
     await storageService.saveCapsules(updated);
   };
 
+  const wrapForWeb = (node) => {
+    if (Platform.OS === 'web') {
+      return (
+        <View style={styles.webBackdrop}>
+          <View style={styles.phoneFrame}>
+            <View style={styles.phoneDynamicIsland} />
+            <View style={styles.phoneScreen}>{node}</View>
+            <View style={styles.phoneHomeBar} />
+          </View>
+        </View>
+      );
+    }
+    return node;
+  };
+
   if (isLoading) {
-    return (
+    return wrapForWeb(
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.burgundy} />
         <Text style={styles.loadingText}>✨ TimeCapsule Yükleniyor... ✨</Text>
       </View>
+    );
+  }
+
+  // İlk girişte gerçek kullanıcı adını sor (Sahte profil yok)
+  if (!currentUser) {
+    return wrapForWeb(
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.contentArea}>
+          <GinghamHeader
+            title="TimeCapsule"
+            subtitle="✨ Gerçek Anılar • Gerçek Dostluklar ✨"
+          />
+          <View style={styles.onboardingCard}>
+            <Text style={styles.onboardingIcon}>🎀</Text>
+            <Text style={styles.onboardingTitle}>Hoş Geldin!</Text>
+            <Text style={styles.onboardingSub}>
+              Kapsüllerde ve grup anılarında görünecek adını yazarak başla:
+            </Text>
+            <TextInput
+              style={styles.onboardingInput}
+              placeholder="Adın (Örn: Dilara)"
+              placeholderTextColor="#998"
+              value={nameInput}
+              onChangeText={setNameInput}
+            />
+            <TouchableOpacity
+              style={[
+                styles.onboardingBtn,
+                !nameInput.trim() && { opacity: 0.5 },
+              ]}
+              onPress={handleSaveUser}
+              disabled={!nameInput.trim()}
+            >
+              <Text style={styles.onboardingBtnText}>Başla ✨</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -103,10 +184,13 @@ export default function App() {
             onSelectCapsule={(cap) => setSelectedCapsule(cap)}
           />
         )}
-        
+
         {/* 2. SEKME: OLUŞTUR */}
         {currentTab === 'create' && (
-          <CreateScreen onCapsuleCreated={handleCapsuleCreated} />
+          <CreateScreen
+            currentUser={currentUser}
+            onCapsuleCreated={handleCapsuleCreated}
+          />
         )}
 
         {/* 3. SEKME: ÖZELİM & GRUP KUTUSU */}
@@ -123,6 +207,7 @@ export default function App() {
         <CapsuleDetailModal
           visible={!!selectedCapsule}
           capsule={selectedCapsule}
+          currentUser={currentUser}
           onClose={() => setSelectedCapsule(null)}
           onUnlock={handleUnlockCapsule}
           onAddMemory={handleAddMemory}
@@ -131,7 +216,6 @@ export default function App() {
 
       {/* Scrapbook Bottom Navigation Bar */}
       <View style={styles.bottomNav}>
-        {/* Üst İnce Dantel Kenar Süsü */}
         <View style={styles.navLace}>
           {Array.from({ length: 24 }).map((_, i) => (
             <View key={`b-lace-${i}`} style={styles.laceDot} />
@@ -139,7 +223,6 @@ export default function App() {
         </View>
 
         <View style={styles.tabsRow}>
-          {/* 1. SEKME: AKIŞ */}
           <TouchableOpacity
             style={[styles.tabButton, currentTab === 'feed' && styles.tabButtonActive]}
             onPress={() => setCurrentTab('feed')}
@@ -152,7 +235,6 @@ export default function App() {
             {currentTab === 'feed' && <View style={styles.activeDot} />}
           </TouchableOpacity>
 
-          {/* 2. SEKME: OLUŞTUR (Vurgulu Buton) */}
           <TouchableOpacity
             style={styles.createButtonWrapper}
             onPress={() => setCurrentTab('create')}
@@ -166,7 +248,6 @@ export default function App() {
             </Text>
           </TouchableOpacity>
 
-          {/* 3. SEKME: ÖZELİM & GRUP KUTUSU */}
           <TouchableOpacity
             style={[styles.tabButton, currentTab === 'inbox' && styles.tabButtonActive]}
             onPress={() => setCurrentTab('inbox')}
@@ -183,21 +264,7 @@ export default function App() {
     </SafeAreaView>
   );
 
-  if (Platform.OS === 'web') {
-    return (
-      <View style={styles.webBackdrop}>
-        <View style={styles.phoneFrame}>
-          {/* Üst Dynamic Island / Ahize */}
-          <View style={styles.phoneDynamicIsland} />
-          <View style={styles.phoneScreen}>{appBody}</View>
-          {/* Alt Home Çizgisi */}
-          <View style={styles.phoneHomeBar} />
-        </View>
-      </View>
-    );
-  }
-
-  return appBody;
+  return wrapForWeb(appBody);
 }
 
 const styles = StyleSheet.create({
@@ -221,6 +288,64 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: colors.burgundyDark,
+  },
+  onboardingCard: {
+    margin: 24,
+    marginTop: 40,
+    backgroundColor: colors.cardBg,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  onboardingIcon: {
+    fontSize: 42,
+    marginBottom: 8,
+  },
+  onboardingTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.burgundyDark,
+    marginBottom: 6,
+  },
+  onboardingSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+  },
+  onboardingInput: {
+    width: '100%',
+    backgroundColor: colors.parchment,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: colors.textPrimary,
+    marginBottom: 14,
+    textAlign: 'center',
+  },
+  onboardingBtn: {
+    backgroundColor: colors.burgundy,
+    borderRadius: 18,
+    paddingHorizontal: 28,
+    paddingVertical: 11,
+    borderWidth: 1.5,
+    borderColor: colors.goldStar,
+  },
+  onboardingBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
   bottomNav: {
     backgroundColor: colors.parchment,

@@ -20,9 +20,11 @@ import PostItNote from '../components/PostItNote';
 export default function CapsuleDetailModal({
   visible,
   capsule,
+  currentUser,
   onClose,
   onUnlock,
   onAddMemory,
+  onDelete,
 }) {
   const [isUnlocked, setIsUnlocked] = useState(capsule?.isUnlocked || false);
   const [showRiddleInput, setShowRiddleInput] = useState(false);
@@ -77,7 +79,7 @@ export default function CapsuleDetailModal({
       id: `mem_${Date.now()}`,
       type: 'postit',
       content: newPostItText.trim(),
-      author: 'Dilara T.',
+      author: currentUser?.name || 'Kullanıcı',
       color: '#FFF6D1',
       pinColor: colors.pinRed,
     };
