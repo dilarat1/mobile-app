@@ -6,12 +6,13 @@ import { getFirestore } from 'firebase/firestore';
 // Firebase Console (console.firebase.google.com) üzerinden "Web App" ekleyip
 // sana verilen firebaseConfig bilgilerini aşağıdaki alanlara yapıştır:
 export const firebaseConfig = {
-  apiKey: 'BURAYA_API_KEY_GELECEK',
-  authDomain: 'BURAYA_AUTH_DOMAIN_GELECEK',
-  projectId: 'BURAYA_PROJECT_ID_GELECEK',
-  storageBucket: 'BURAYA_STORAGE_BUCKET_GELECEK',
-  messagingSenderId: 'BURAYA_MESSAGING_SENDER_ID_GELECEK',
-  appId: 'BURAYA_APP_ID_GELECEK',
+  apiKey: 'AIzaSyC78IOFnvgQAy-WZLizI_IGrmdXaAp-nys',
+  authDomain: 'timecapsule-a11ba.firebaseapp.com',
+  projectId: 'timecapsule-a11ba',
+  storageBucket: 'timecapsule-a11ba.firebasestorage.app',
+  messagingSenderId: '663309062749',
+  appId: '1:663309062749:web:dd084889bb75d5c72af3b4',
+  measurementId: 'G-BZHB9DXSVF',
 };
 
 // Firebase ayarlarının doldurulup doldurulmadığını kontrol eder
