@@ -58,16 +58,20 @@ export const storageService = {
     const normPhone = normalizePhone(phone);
 
     if (isFirebaseConfigured && db) {
-      const usersRef = collection(db, 'users');
-      const emailSnap = await getDocs(query(usersRef, where('email', '==', normEmail)));
-      if (!emailSnap.empty) {
-        return { exists: true, reason: 'Bu e-posta adresi zaten bir hesaba bağlı.' };
-      }
-      if (normPhone) {
-        const phoneSnap = await getDocs(query(usersRef, where('phone', '==', normPhone)));
-        if (!phoneSnap.empty) {
-          return { exists: true, reason: 'Bu telefon numarası zaten bir hesaba bağlı.' };
+      try {
+        const usersRef = collection(db, 'users');
+        const emailSnap = await getDocs(query(usersRef, where('email', '==', normEmail)));
+        if (!emailSnap.empty) {
+          return { exists: true, reason: 'Bu e-posta adresi zaten bir hesaba bağlı.' };
         }
+        if (normPhone) {
+          const phoneSnap = await getDocs(query(usersRef, where('phone', '==', normPhone)));
+          if (!phoneSnap.empty) {
+            return { exists: true, reason: 'Bu telefon numarası zaten bir hesaba bağlı.' };
+          }
+        }
+      } catch (err) {
+        console.warn('Firestore checkAccountExists warning:', err.code || err.message);
       }
       return { exists: false };
     }
@@ -117,7 +121,11 @@ export const storageService = {
           avatar: avatarUrl,
           createdAt: new Date().toISOString(),
         };
-        await setDoc(doc(db, 'users', cred.user.uid), userObj);
+        try {
+          await setDoc(doc(db, 'users', cred.user.uid), userObj);
+        } catch (fsErr) {
+          console.warn('Firestore user write warning:', fsErr.code || fsErr.message);
+        }
         return { ok: true, user: userObj, requiresEmailVerification: true };
       } catch (err) {
         if (err.code === 'auth/email-already-in-use') {
@@ -159,14 +167,21 @@ export const storageService = {
             'E-postan henüz doğrulanmadı! Gelen kutuna (veya Spam klasörüne) gelen linke tıkladıktan sonra tekrar dene.',
         };
       }
-      const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-      const userData = userDoc.exists()
-        ? userDoc.data()
-        : {
-            id: auth.currentUser.uid,
-            name: auth.currentUser.email.split('@')[0],
-            email: auth.currentUser.email,
-          };
+      let userData = {
+        id: auth.currentUser.uid,
+        name: auth.currentUser.email.split('@')[0],
+        email: auth.currentUser.email,
+        avatar:
+          'https://ui-avatars.com/api/?name=' +
+          encodeURIComponent(auth.currentUser.email.split('@')[0]) +
+          '&background=731C28&color=FAF7F2',
+      };
+      try {
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (userDoc.exists()) userData = userDoc.data();
+      } catch (fsErr) {
+        console.warn('Firestore user read warning:', fsErr.code || fsErr.message);
+      }
       await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(userData));
       return { ok: true, user: userData };
     } catch (err) {
@@ -216,15 +231,32 @@ export const storageService = {
           };
         }
 
-        const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
-        const userData = userDoc.exists()
-          ? userDoc.data()
-          : { id: cred.user.uid, name: targetEmail.split('@')[0], email: targetEmail };
+        let userData = {
+          id: cred.user.uid,
+          name: targetEmail.split('@')[0],
+          email: targetEmail,
+          avatar:
+            'https://ui-avatars.com/api/?name=' +
+            encodeURIComponent(targetEmail.split('@')[0]) +
+            '&background=731C28&color=FAF7F2',
+        };
+        try {
+          const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+          if (userDoc.exists()) userData = userDoc.data();
+        } catch (fsErr) {
+          console.warn('Firestore login user read warning:', fsErr.code || fsErr.message);
+        }
 
         await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(userData));
         return { ok: true, user: userData };
       } catch (err) {
-        return { ok: false, error: 'E-posta/telefon veya şifre hatalı!' };
+        if (err.code === 'auth/too-many-requests') {
+          return { ok: false, error: 'Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar dene.' };
+        }
+        if (err.code === 'auth/user-not-found') {
+          return { ok: false, error: 'Bu bilgiyle kayıtlı bir hesap bulunamadı. Lütfen önce Kayıt Ol.' };
+        }
+        return { ok: false, error: 'E-posta/telefon veya şifre hatalı (veya henüz Firebase kaydın yok).' };
       }
     }
 
