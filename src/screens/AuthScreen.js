@@ -26,6 +26,11 @@ export default function AuthScreen({ onAuthSuccess }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  // Kayıt doğrulama (OTP) alanları
+  const [registerStep, setRegisterStep] = useState(1); // 1: form, 2: OTP doğrula
+  const [registerOtpInput, setRegisterOtpInput] = useState('');
+  const [registerSentOtp, setRegisterSentOtp] = useState('');
+
   // Şifremi Unuttum alanları
   const [forgotStep, setForgotStep] = useState(1); // 1: mail/tel gir, 2: kod + yeni şifre
   const [verificationCode, setVerificationCode] = useState('');
@@ -81,8 +86,8 @@ export default function AuthScreen({ onAuthSuccess }) {
     onAuthSuccess(res.user);
   };
 
-  // Kayıt Ol
-  const handleRegister = async () => {
+  // Kayıt Ol - 1. Adım: Bilgileri doğrula ve 6 haneli doğrulama kodu gönder
+  const handleSendRegisterOtp = async () => {
     clearMessages();
     if (fullName.trim().length < 2) {
       setErrorMsg('Lütfen ad ve soyadını gir.');
@@ -99,6 +104,35 @@ export default function AuthScreen({ onAuthSuccess }) {
     }
     if (password !== confirmPassword) {
       setErrorMsg('Girdiğin şifreler birbiriyle eşleşmiyor.');
+      return;
+    }
+
+    // Aynı mail veya telefon zaten kayıtlı mı kontrol et
+    const users = await storageService.getRegisteredUsers();
+    const exists = users.find(
+      (u) => u.identifier.toLowerCase() === identifier.trim().toLowerCase()
+    );
+    if (exists) {
+      setErrorMsg('Bu bilgiyle zaten bir hesap mevcut. Giriş yapmayı dene.');
+      return;
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    setRegisterSentOtp(otp);
+    setRegisterOtpInput('');
+    setRegisterStep(2);
+    setSuccessMsg(
+      `${
+        method === 'phone' ? '📱 Telefonuna SMS' : '✉️ E-postana'
+      } doğrulama kodu gönderildi! (Test Kodu: ${otp})`
+    );
+  };
+
+  // Kayıt Ol - 2. Adım: Doğrulama kodunu kontrol et ve hesabı aç
+  const handleVerifyAndRegister = async () => {
+    clearMessages();
+    if (registerOtpInput.trim() !== registerSentOtp) {
+      setErrorMsg('Doğrulama kodu hatalı! Kod onaylanmadan hesap oluşturulamaz.');
       return;
     }
 
@@ -208,6 +242,7 @@ export default function AuthScreen({ onAuthSuccess }) {
                 style={[styles.modeTab, mode === 'login' && styles.modeTabActive]}
                 onPress={() => {
                   setMode('login');
+                  setRegisterStep(1);
                   clearMessages();
                 }}
               >
@@ -225,6 +260,7 @@ export default function AuthScreen({ onAuthSuccess }) {
                 style={[styles.modeTab, mode === 'register' && styles.modeTabActive]}
                 onPress={() => {
                   setMode('register');
+                  setRegisterStep(1);
                   clearMessages();
                 }}
               >
@@ -253,8 +289,8 @@ export default function AuthScreen({ onAuthSuccess }) {
             </View>
           ) : null}
 
-          {/* ================= 1. GİRİŞ YAP & KAYIT OL FORMU ================= */}
-          {(mode === 'login' || mode === 'register') && (
+          {/* ================= 1. GİRİŞ YAP & KAYIT OL (1. ADIM) ================= */}
+          {(mode === 'login' || (mode === 'register' && registerStep === 1)) && (
             <View>
               {/* Yöntem Seçimi: E-posta vs Telefon No */}
               <View style={styles.methodRow}>
@@ -388,11 +424,11 @@ export default function AuthScreen({ onAuthSuccess }) {
               {/* Ana Buton */}
               <TouchableOpacity
                 style={styles.primaryBtn}
-                onPress={mode === 'login' ? handleLogin : handleRegister}
+                onPress={mode === 'login' ? handleLogin : handleSendRegisterOtp}
                 activeOpacity={0.85}
               >
                 <Text style={styles.primaryBtnText}>
-                  {mode === 'login' ? 'Giriş Yap 🎀' : 'Hesap Oluştur ✨'}
+                  {mode === 'login' ? 'Giriş Yap 🎀' : 'Doğrulama Kodu Gönder 📩'}
                 </Text>
               </TouchableOpacity>
 
@@ -423,6 +459,7 @@ export default function AuthScreen({ onAuthSuccess }) {
                 style={styles.switchPrompt}
                 onPress={() => {
                   setMode(mode === 'login' ? 'register' : 'login');
+                  setRegisterStep(1);
                   clearMessages();
                 }}
               >
@@ -430,6 +467,57 @@ export default function AuthScreen({ onAuthSuccess }) {
                   {mode === 'login'
                     ? 'Henüz hesabın yok mu? Kayıt Ol →'
                     : 'Zaten hesabın var mı? Giriş Yap →'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ================= 1B. KAYIT DOĞRULAMA (OTP) EKRANI ================= */}
+          {mode === 'register' && registerStep === 2 && (
+            <View>
+              <Text style={styles.subCardTitle}>🔐 Hesap Doğrulama</Text>
+              <Text style={styles.subCardDesc}>
+                Başkasının adına hesap açılmasını önlemek için{' '}
+                <Text style={{ fontWeight: '800', color: colors.burgundyDark }}>
+                  {identifier}
+                </Text>{' '}
+                bilgisine 6 haneli doğrulama kodu gönderildi.
+              </Text>
+
+              <Text style={styles.inputLabel}>6 Haneli Doğrulama Kodu *</Text>
+              <TextInput
+                style={[styles.input, { textAlign: 'center', fontSize: 18, letterSpacing: 6, fontWeight: '800' }]}
+                placeholder="000000"
+                placeholderTextColor="#998"
+                keyboardType="number-pad"
+                maxLength={6}
+                value={registerOtpInput}
+                onChangeText={setRegisterOtpInput}
+              />
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, { marginTop: 14 }]}
+                onPress={handleVerifyAndRegister}
+              >
+                <Text style={styles.primaryBtnText}>Kodu Doğrula ve Hesabı Aç ✓</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.switchPrompt}
+                onPress={handleSendRegisterOtp}
+              >
+                <Text style={styles.switchPromptText}>🔄 Kodu Tekrar Gönder</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.switchPrompt}
+                onPress={() => {
+                  setRegisterStep(1);
+                  clearMessages();
+                }}
+              >
+                <Text style={[styles.switchPromptText, { color: colors.textSecondary }]}>
+                  ← Bilgileri Düzenle
                 </Text>
               </TouchableOpacity>
             </View>
