@@ -138,7 +138,7 @@ export default function AuthScreen({ onAuthSuccess }) {
       }
       setRegisterStep(2);
       setSuccessMsg(
-        `✉️ ${regEmail.trim()} adresine gerçek doğrulama bağlantısı gönderdik! Gelen kutunu (ve Spam klasörünü) kontrol et.`
+        `Doğrulama bağlantısı ${regEmail.trim()} adresine gönderildi.`
       );
       return;
     }
@@ -569,7 +569,7 @@ export default function AuthScreen({ onAuthSuccess }) {
                     <Text style={{ fontWeight: '800', color: colors.burgundyDark }}>
                       {regEmail}
                     </Text>{' '}
-                    adresine gerçek doğrulama bağlantısı gönderildi. Gelen kutundaki (veya Spam) linke tıkladıktan sonra aşağıdaki butona bas.
+                    adresine bir doğrulama bağlantısı gönderdik. Lütfen gelen kutunu (ve gereksiz/spam klasörünü) kontrol edip bağlantıya tıkla, ardından aşağıdaki butona bas.
                   </>
                 ) : (
                   <>
