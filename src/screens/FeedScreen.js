@@ -7,29 +7,44 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
+  Image,
+  ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { mockCapsules } from '../data/mockCapsules';
 import GinghamHeader from '../components/GinghamHeader';
 import CapsuleCard from '../components/CapsuleCard';
 
-export default function FeedScreen({ capsules: propCapsules, onNavigateToCreate, onSelectCapsule }) {
-  const [internalCapsules, setInternalCapsules] = useState(mockCapsules);
-  const capsules = propCapsules || internalCapsules;
+export default function FeedScreen({
+  capsules = [],
+  currentUser,
+  onNavigateToCreate,
+  onNavigateToProfile,
+  onSelectCapsule,
+}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all'); // 'all', 'group', 'locked', 'unlocked'
 
-  // Filtreleme mantığı
+  const userName = currentUser?.name?.split(' ')[0] || 'Misafir';
+  const userAvatar =
+    currentUser?.avatar ||
+    'https://ui-avatars.com/api/?name=' +
+      encodeURIComponent(userName) +
+      '&background=731C28&color=FAF7F2';
+
+  const totalCount = capsules.length;
+  const lockedCount = capsules.filter((c) => !c.isUnlocked).length;
+  const unlockedCount = capsules.filter((c) => c.isUnlocked).length;
+  const groupCount = capsules.filter((c) => c.isGroup).length;
+
   const filteredCapsules = capsules.filter((item) => {
-    // Arama filtrelemesi
     const matchesSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.author.name.toLowerCase().includes(searchQuery.toLowerCase());
+      item.author?.name?.toLowerCase().includes(searchQuery.toLowerCase());
 
     if (!matchesSearch) return false;
 
-    // Kategori filtrelemesi
     if (selectedFilter === 'group') return item.isGroup;
     if (selectedFilter === 'locked') return !item.isUnlocked;
     if (selectedFilter === 'unlocked') return item.isUnlocked;
@@ -37,21 +52,62 @@ export default function FeedScreen({ capsules: propCapsules, onNavigateToCreate,
     return true;
   });
 
+  const filterPills = [
+    { id: 'all', label: `Tümü (${totalCount})`, icon: 'layers-outline' },
+    { id: 'group', label: `Grupça (${groupCount})`, icon: 'people-outline' },
+    { id: 'locked', label: `Kilitli (${lockedCount})`, icon: 'lock-closed-outline' },
+    { id: 'unlocked', label: `Açılanlar (${unlockedCount})`, icon: 'lock-open-outline' },
+  ];
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.burgundyDark} />
 
-      {/* Pötikare & Fiyonklu Vintage Header */}
       <GinghamHeader
         title="TimeCapsule"
-        subtitle="✨ Nostalji Akışı • Ortak Anılar & Kapsüller ✨"
+        subtitle="Anılarını Kilitle, Zamanı Gelince Aç"
       />
+
+      {/* Karşılama & Mini Profil / Özet Şeridi */}
+      <View style={styles.welcomeStrip}>
+        <View style={styles.welcomeLeft}>
+          <Text style={styles.welcomeGreeting}>Merhaba, {userName}</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Ionicons name="cube-outline" size={12} color={colors.textSecondary} />
+              <Text style={styles.statText}>{totalCount} Kapsül</Text>
+            </View>
+            <Text style={styles.statDot}>•</Text>
+            <View style={styles.statItem}>
+              <Ionicons name="lock-closed-outline" size={12} color={colors.textSecondary} />
+              <Text style={styles.statText}>{lockedCount} Mühürlü</Text>
+            </View>
+            <Text style={styles.statDot}>•</Text>
+            <View style={styles.statItem}>
+              <Ionicons name="lock-open-outline" size={12} color={colors.textSecondary} />
+              <Text style={styles.statText}>{unlockedCount} Açık</Text>
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.profileChip}
+          onPress={onNavigateToProfile}
+          activeOpacity={0.8}
+        >
+          <Image source={{ uri: userAvatar }} style={styles.profileAvatar} />
+        </TouchableOpacity>
+      </View>
 
       {/* Arama ve Filtreleme Bölümü */}
       <View style={styles.searchFilterContainer}>
-        {/* Arama Çubuğu */}
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Ionicons
+            name="search-outline"
+            size={16}
+            color={colors.textMuted}
+            style={styles.searchIcon}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Kapsül, anı veya arkadaş ara..."
@@ -61,29 +117,30 @@ export default function FeedScreen({ capsules: propCapsules, onNavigateToCreate,
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Text style={styles.clearSearchIcon}>✕</Text>
+              <Ionicons name="close-circle" size={17} color={colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Filtreleme Hapları (Filter Pills) */}
-        <View style={styles.filterPillsRow}>
-          {[
-            { id: 'all', label: `Tümü (${capsules.length})` },
-            { id: 'group', label: '👥 Grupça' },
-            { id: 'locked', label: '🔒 Kilitli' },
-            { id: 'unlocked', label: '🎉 Açılanlar' },
-          ].map((pill) => {
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterPillsRow}
+        >
+          {filterPills.map((pill) => {
             const isSelected = selectedFilter === pill.id;
             return (
               <TouchableOpacity
                 key={pill.id}
-                style={[
-                  styles.filterPill,
-                  isSelected && styles.filterPillActive,
-                ]}
+                style={[styles.filterPill, isSelected && styles.filterPillActive]}
                 onPress={() => setSelectedFilter(pill.id)}
+                activeOpacity={0.8}
               >
+                <Ionicons
+                  name={pill.icon}
+                  size={13}
+                  color={isSelected ? '#FFFFFF' : colors.textSecondary}
+                />
                 <Text
                   style={[
                     styles.filterPillText,
@@ -95,7 +152,7 @@ export default function FeedScreen({ capsules: propCapsules, onNavigateToCreate,
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
       </View>
 
       {/* Kapsül Akışı Listesi */}
@@ -111,21 +168,49 @@ export default function FeedScreen({ capsules: propCapsules, onNavigateToCreate,
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🎀</Text>
-            <Text style={styles.emptyTitle}>Akışın Henüz Boş</Text>
-            <Text style={styles.emptySub}>
-              {capsules.length === 0
-                ? 'Arkadaşlarınla ilk gerçek zaman kapsülünü oluşturup anılarını mühürlemeye başla!'
-                : 'Arama veya filtrelere uygun kapsül bulunamadı.'}
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyTape} />
+            <Ionicons
+              name="sparkles"
+              size={13}
+              color={colors.goldStar}
+              style={styles.emptyCornerLeft}
+            />
+            <Ionicons
+              name="sparkles"
+              size={13}
+              color={colors.goldStar}
+              style={styles.emptyCornerRight}
+            />
+
+            <View style={styles.emptyIconCircle}>
+              <Ionicons
+                name={totalCount === 0 ? 'hourglass-outline' : 'search-outline'}
+                size={28}
+                color={colors.burgundy}
+              />
+            </View>
+
+            <Text style={styles.emptyTitle}>
+              {totalCount === 0
+                ? 'İlk Anını Mühürlemeye Hazır Mısın?'
+                : 'Sonuç Bulunamadı'}
             </Text>
-            {capsules.length === 0 && onNavigateToCreate && (
+
+            <Text style={styles.emptySub}>
+              {totalCount === 0
+                ? 'Arkadaşlarınla ya da kendine özel sakladığın tüm zaman kapsülleri burada görünecek. Fotoğraf, ses kaydı veya bir not bırakarak başla.'
+                : 'Arama kelimeni veya seçili filtreyi değiştirerek tekrar deneyebilirsin.'}
+            </Text>
+
+            {totalCount === 0 && onNavigateToCreate && (
               <TouchableOpacity
                 style={styles.emptyCtaBtn}
                 onPress={onNavigateToCreate}
                 activeOpacity={0.85}
               >
-                <Text style={styles.emptyCtaText}>＋ İlk Kapsülü Oluştur ✨</Text>
+                <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.emptyCtaText}>İlk Kapsülü Oluştur</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -140,11 +225,67 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  welcomeStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: colors.cardBg,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  welcomeLeft: {
+    flex: 1,
+  },
+  welcomeGreeting: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.burgundyDark,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  statDot: {
+    fontSize: 10,
+    color: colors.textMuted,
+    marginHorizontal: 6,
+  },
+  profileChip: {
+    padding: 2,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: colors.burgundy,
+  },
+  profileAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
   searchFilterContainer: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 10,
     paddingBottom: 6,
-    backgroundColor: colors.background,
   },
   searchBar: {
     flexDirection: 'row',
@@ -157,25 +298,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   searchIcon: {
-    fontSize: 14,
-    marginRight: 6,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 13,
     color: colors.textPrimary,
   },
-  clearSearchIcon: {
-    fontSize: 14,
-    color: '#888',
-    paddingHorizontal: 4,
-  },
   filterPillsRow: {
     flexDirection: 'row',
     gap: 8,
     marginTop: 10,
+    paddingRight: 16,
   },
   filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -198,26 +337,65 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 40,
   },
-  emptyContainer: {
+  emptyCard: {
+    marginHorizontal: 16,
+    marginTop: 22,
+    backgroundColor: colors.cardBg,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    paddingVertical: 30,
+    paddingHorizontal: 22,
+    alignItems: 'center',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  emptyTape: {
+    position: 'absolute',
+    top: -8,
+    width: 66,
+    height: 16,
+    backgroundColor: colors.washiKraft,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  emptyCornerLeft: {
+    position: 'absolute',
+    top: 14,
+    left: 16,
+  },
+  emptyCornerRight: {
+    position: 'absolute',
+    top: 14,
+    right: 16,
+  },
+  emptyIconCircle: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: colors.parchment,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 30,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: colors.burgundyDark,
+    textAlign: 'center',
   },
   emptySub: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: 8,
     lineHeight: 18,
   },
   emptyCtaBtn: {
@@ -228,6 +406,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: colors.goldStar,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   emptyCtaText: {
     color: '#FFFFFF',

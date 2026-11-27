@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 
-export default function GinghamHeader({ title, subtitle, unreadCount }) {
-  // Pötikare (Gingham) şeritleri için dizi
+export default function GinghamHeader({ title, subtitle }) {
   const stripes = Array.from({ length: 18 });
 
   return (
@@ -36,20 +36,23 @@ export default function GinghamHeader({ title, subtitle, unreadCount }) {
 
       {/* Ortadaki Vintage Parşömen Başlık Kartı */}
       <View style={styles.titleCard}>
-        {/* Sol ve Sağ Küçük Kırmızı Kurdele Fiyonkları */}
-        <View style={styles.cornerBowLeft}>
-          <Text style={styles.bowEmoji}>🎀</Text>
-        </View>
-        <View style={styles.cornerBowRight}>
-          <Text style={styles.bowEmoji}>🎀</Text>
-        </View>
-
-        {/* Altın Yıldız Pırıltıları */}
-        <Text style={styles.goldStarLeft}>✦</Text>
-        <Text style={styles.goldStarRight}>✦</Text>
+        <Ionicons
+          name="sparkles"
+          size={13}
+          color={colors.goldStar}
+          style={styles.goldStarLeft}
+        />
+        <Ionicons
+          name="sparkles"
+          size={13}
+          color={colors.goldStar}
+          style={styles.goldStarRight}
+        />
 
         <Text style={styles.titleText}>{title || 'TimeCapsule'}</Text>
-        <Text style={styles.subtitleText}>{subtitle || '✨ Anılarını Kilitle, Gelecekte Aç ✨'}</Text>
+        <Text style={styles.subtitleText}>
+          {subtitle || 'Anılarını Kilitle, Zamanı Gelince Aç'}
+        </Text>
       </View>
 
       {/* Dantel / Fisto Kenar Süsü (Scalloped Lace Edge) */}
@@ -65,7 +68,7 @@ export default function GinghamHeader({ title, subtitle, unreadCount }) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.burgundy,
-    paddingTop: 48,
+    paddingTop: 44,
     paddingBottom: 16,
     position: 'relative',
     overflow: 'hidden',
@@ -99,9 +102,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     backgroundColor: colors.parchment,
     borderRadius: 14,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: colors.cardBorder,
-    paddingVertical: 12,
+    paddingVertical: 11,
     paddingHorizontal: 16,
     alignItems: 'center',
     position: 'relative',
@@ -111,47 +114,28 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  cornerBowLeft: {
-    position: 'absolute',
-    top: -12,
-    left: -8,
-  },
-  cornerBowRight: {
-    position: 'absolute',
-    top: -12,
-    right: -8,
-  },
-  bowEmoji: {
-    fontSize: 22,
-  },
   goldStarLeft: {
     position: 'absolute',
-    top: 6,
-    left: 12,
-    color: colors.goldStar,
-    fontSize: 14,
-    fontWeight: 'bold',
+    top: 10,
+    left: 14,
   },
   goldStarRight: {
     position: 'absolute',
-    top: 6,
-    right: 12,
-    color: colors.goldStar,
-    fontSize: 14,
-    fontWeight: 'bold',
+    top: 10,
+    right: 14,
   },
   titleText: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '800',
     color: colors.burgundyDark,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   subtitleText: {
     fontSize: 11,
     fontWeight: '600',
     color: colors.textSecondary,
     marginTop: 2,
-    fontStyle: 'italic',
+    letterSpacing: 0.2,
   },
   laceContainer: {
     position: 'absolute',

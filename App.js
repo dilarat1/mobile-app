@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from './src/theme/colors';
 import { storageService } from './src/services/storageService';
 import AuthScreen from './src/screens/AuthScreen';
@@ -16,6 +17,7 @@ import FeedScreen from './src/screens/FeedScreen';
 import CreateScreen from './src/screens/CreateScreen';
 import InboxScreen from './src/screens/InboxScreen';
 import CapsuleDetailModal from './src/screens/CapsuleDetailModal';
+import GinghamHeader from './src/components/GinghamHeader';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('feed'); // 'feed', 'create', 'inbox'
@@ -131,12 +133,31 @@ export default function App() {
         {currentTab === 'feed' && (
           <FeedScreen
             capsules={capsulesList}
+            currentUser={currentUser}
             onNavigateToCreate={() => setCurrentTab('create')}
+            onNavigateToProfile={() => setCurrentTab('profile')}
             onSelectCapsule={(cap) => setSelectedCapsule(cap)}
           />
         )}
 
-        {/* 2. SEKME: OLUŞTUR */}
+        {/* 2. SEKME: KEŞFET (Yakındaki Konum & Topluluk Kapsülleri) */}
+        {currentTab === 'explore' && (
+          <View style={styles.contentArea}>
+            <GinghamHeader
+              title="Keşfet"
+              subtitle="Çevrendeki Konum & Topluluk Kapsülleri"
+            />
+            <View style={styles.placeholderBox}>
+              <Ionicons name="compass-outline" size={44} color={colors.burgundy} />
+              <Text style={styles.placeholderTitle}>Konum & Topluluk Keşfi</Text>
+              <Text style={styles.placeholderDesc}>
+                Mekan kilidi olan kapsülleri harita/yakınlık radarında burada göstereceğiz.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* 3. SEKME: OLUŞTUR */}
         {currentTab === 'create' && (
           <CreateScreen
             currentUser={currentUser}
@@ -144,7 +165,7 @@ export default function App() {
           />
         )}
 
-        {/* 3. SEKME: ÖZELİM & GRUP KUTUSU */}
+        {/* 4. SEKME: KUTUM (Özel & Grup Kapsülleri) */}
         {currentTab === 'inbox' && (
           <InboxScreen
             capsules={capsulesList}
@@ -152,6 +173,26 @@ export default function App() {
             onSelectCapsule={(cap) => setSelectedCapsule(cap)}
             onLogout={handleLogout}
           />
+        )}
+
+        {/* 5. SEKME: PROFİL */}
+        {currentTab === 'profile' && (
+          <View style={styles.contentArea}>
+            <GinghamHeader
+              title="Profilim"
+              subtitle="Kapsül Arşivin & Hesap Ayarları"
+            />
+            <View style={styles.placeholderBox}>
+              <Ionicons name="person-circle-outline" size={48} color={colors.burgundy} />
+              <Text style={styles.placeholderTitle}>{currentUser?.name}</Text>
+              <Text style={styles.placeholderDesc}>
+                Ana ekranı tamamladıktan sonra profil ekranını birlikte tasarlayacağız.
+              </Text>
+              <TouchableOpacity style={styles.placeholderLogoutBtn} onPress={handleLogout}>
+                <Text style={styles.placeholderLogoutText}>Çıkış Yap</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
       </View>
 
@@ -167,7 +208,7 @@ export default function App() {
         />
       )}
 
-      {/* Scrapbook Bottom Navigation Bar */}
+      {/* 5 Sekmeli Profesyonel Bottom Navigation Bar */}
       <View style={styles.bottomNav}>
         <View style={styles.navLace}>
           {Array.from({ length: 24 }).map((_, i) => (
@@ -177,15 +218,35 @@ export default function App() {
 
         <View style={styles.tabsRow}>
           <TouchableOpacity
-            style={[styles.tabButton, currentTab === 'feed' && styles.tabButtonActive]}
+            style={styles.tabButton}
             onPress={() => setCurrentTab('feed')}
             activeOpacity={0.7}
           >
-            <Text style={styles.tabIcon}>📜</Text>
+            <Ionicons
+              name={currentTab === 'feed' ? 'home' : 'home-outline'}
+              size={21}
+              color={currentTab === 'feed' ? colors.burgundy : colors.textMuted}
+            />
             <Text style={[styles.tabLabel, currentTab === 'feed' && styles.tabLabelActive]}>
               Akış
             </Text>
             {currentTab === 'feed' && <View style={styles.activeDot} />}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.tabButton}
+            onPress={() => setCurrentTab('explore')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={currentTab === 'explore' ? 'compass' : 'compass-outline'}
+              size={22}
+              color={currentTab === 'explore' ? colors.burgundy : colors.textMuted}
+            />
+            <Text style={[styles.tabLabel, currentTab === 'explore' && styles.tabLabelActive]}>
+              Keşfet
+            </Text>
+            {currentTab === 'explore' && <View style={styles.activeDot} />}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -194,23 +255,43 @@ export default function App() {
             activeOpacity={0.8}
           >
             <View style={styles.createButton}>
-              <Text style={styles.createButtonIcon}>＋</Text>
+              <Ionicons name="add" size={26} color="#FFFFFF" />
             </View>
             <Text style={[styles.tabLabel, currentTab === 'create' && styles.tabLabelActive]}>
-              Kapsül Yap
+              Oluştur
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabButton, currentTab === 'inbox' && styles.tabButtonActive]}
+            style={styles.tabButton}
             onPress={() => setCurrentTab('inbox')}
             activeOpacity={0.7}
           >
-            <Text style={styles.tabIcon}>💌</Text>
+            <Ionicons
+              name={currentTab === 'inbox' ? 'chatbubbles' : 'chatbubbles-outline'}
+              size={21}
+              color={currentTab === 'inbox' ? colors.burgundy : colors.textMuted}
+            />
             <Text style={[styles.tabLabel, currentTab === 'inbox' && styles.tabLabelActive]}>
-              Özelim
+              Kutum
             </Text>
             {currentTab === 'inbox' && <View style={styles.activeDot} />}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.tabButton}
+            onPress={() => setCurrentTab('profile')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={currentTab === 'profile' ? 'person' : 'person-outline'}
+              size={21}
+              color={currentTab === 'profile' ? colors.burgundy : colors.textMuted}
+            />
+            <Text style={[styles.tabLabel, currentTab === 'profile' && styles.tabLabelActive]}>
+              Profil
+            </Text>
+            {currentTab === 'profile' && <View style={styles.activeDot} />}
           </TouchableOpacity>
         </View>
       </View>
@@ -433,5 +514,38 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(60, 40, 40, 0.35)',
     borderRadius: 2,
     zIndex: 1000,
+  },
+  placeholderBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  placeholderTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.burgundyDark,
+    marginTop: 12,
+  },
+  placeholderDesc: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 19,
+  },
+  placeholderLogoutBtn: {
+    marginTop: 20,
+    backgroundColor: '#F7EDEE',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5B8BE',
+  },
+  placeholderLogoutText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.burgundy,
   },
 });
