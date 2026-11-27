@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput,
   Image,
+  Platform,
 } from 'react-native';
 import { colors } from '../theme/colors';
 import LockBadges from '../components/LockBadges';
@@ -86,8 +87,7 @@ export default function CapsuleDetailModal({
     Alert.alert('📸 Anı Eklendi', 'Yeni notun kapsüle iliştirildi!');
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" transparent={false}>
+  const content = (
       <View style={styles.container}>
         {/* Üst Bar: Geri Dön Butonu ve Başlık */}
         <View style={styles.topBar}>
@@ -302,6 +302,16 @@ export default function CapsuleDetailModal({
           </View>
         )}
       </View>
+  );
+
+  if (Platform.OS === 'web') {
+    if (!visible) return null;
+    return <View style={[StyleSheet.absoluteFill, { zIndex: 999 }]}>{content}</View>;
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={false}>
+      {content}
     </Modal>
   );
 }

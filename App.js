@@ -89,7 +89,7 @@ export default function App() {
     );
   }
 
-  return (
+  const appBody = (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
 
@@ -182,6 +182,22 @@ export default function App() {
       </View>
     </SafeAreaView>
   );
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webBackdrop}>
+        <View style={styles.phoneFrame}>
+          {/* Üst Dynamic Island / Ahize */}
+          <View style={styles.phoneDynamicIsland} />
+          <View style={styles.phoneScreen}>{appBody}</View>
+          {/* Alt Home Çizgisi */}
+          <View style={styles.phoneHomeBar} />
+        </View>
+      </View>
+    );
+  }
+
+  return appBody;
 }
 
 const styles = StyleSheet.create({
@@ -292,5 +308,52 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     marginTop: -2,
+  },
+  webBackdrop: {
+    flex: 1,
+    backgroundColor: '#E8DFD3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  phoneFrame: {
+    width: 390,
+    height: '100%',
+    maxHeight: 830,
+    backgroundColor: '#1E1A1A',
+    borderRadius: 44,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    elevation: 16,
+    position: 'relative',
+    alignItems: 'center',
+  },
+  phoneDynamicIsland: {
+    position: 'absolute',
+    top: 18,
+    width: 108,
+    height: 24,
+    backgroundColor: '#111111',
+    borderRadius: 12,
+    zIndex: 1000,
+  },
+  phoneScreen: {
+    flex: 1,
+    width: '100%',
+    borderRadius: 36,
+    overflow: 'hidden',
+    backgroundColor: colors.burgundyDark,
+  },
+  phoneHomeBar: {
+    position: 'absolute',
+    bottom: 16,
+    width: 120,
+    height: 4,
+    backgroundColor: 'rgba(60, 40, 40, 0.35)',
+    borderRadius: 2,
+    zIndex: 1000,
   },
 });
